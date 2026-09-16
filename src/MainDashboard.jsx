@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import { db } from './firebase.js';
 import { ref, onValue, set } from 'firebase/database';
-import DataHistory from './DataHistory.jsx';
 
 function MainDashboard() {
-  const [showHistory, setShowHistory] = useState(false);
-
   // --- STATE (matches actual master board schema under /sensors) ---
   const [soilMoisture, setSoilMoisture] = useState(0);
   const [humidity, setHumidity] = useState(0);
@@ -18,7 +15,7 @@ function MainDashboard() {
   const [sensorStatus, setSensorStatus] = useState("");
   const [lastWatered, setLastWatered] = useState(null);
   const [lastSeen, setLastSeen] = useState(null);
-  const [nowTick, setNowTick] = useState(Date.now());
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   // Camera state — lives under /sensors/camera, matching the master
   // board's schema convention. Image itself lives in Firebase Storage
@@ -27,8 +24,6 @@ function MainDashboard() {
   const [lastImageTimestamp, setLastImageTimestamp] = useState(null);
   const [captureRequested, setCaptureRequested] = useState(null);
   const [captureError, setCaptureError] = useState(null);
-  const [recentPhotos, setRecentPhotos] = useState([]); // up to 5, newest first
-  const [cameraLastSeen, setCameraLastSeen] = useState(null);
 
   // --- REAL-TIME RTDB LISTENERS ---
   useEffect(() => {
@@ -74,14 +69,6 @@ function MainDashboard() {
         if (data.lastImageTimestamp !== undefined) setLastImageTimestamp(data.lastImageTimestamp);
         if (data.captureRequested !== undefined) setCaptureRequested(data.captureRequested);
         setCaptureError(data.captureError !== undefined ? data.captureError : null);
-
-        if (data.photos) {
-          const list = Object.values(data.photos)
-            .filter((p) => p && p.url)
-            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-          setRecentPhotos(list);
-        }
-        if (data.last_seen !== undefined) setCameraLastSeen(data.last_seen);
       }
     });
 
@@ -139,9 +126,7 @@ function MainDashboard() {
   const isCapturing =
     captureRequested && (!lastImageTimestamp || lastImageTimestamp < captureRequested);
 
-  // If a capture has been "in progress" for too long, the board almost
-  // certainly failed silently (crashed, lost Wi-Fi, upload error) rather
-  // than genuinely still working — don't leave the UI stuck forever.
+  // Avoid leaving the capture controls disabled when the board never responds.
   const CAPTURE_TIMEOUT_SEC = 30;
   const captureElapsed = captureRequested
     ? Math.floor(nowTick / 1000) - captureRequested
@@ -166,38 +151,6 @@ function MainDashboard() {
     ? `${secondsSinceLastSeen}s ago`
     : "Never";
 
-  const secondsSinceCameraSeen = cameraLastSeen ? Math.floor(nowTick / 1000) - cameraLastSeen : null;
-  const isCameraOnline = secondsSinceCameraSeen !== null && secondsSinceCameraSeen < 90;
-  const cameraLastSeenDisplay = cameraLastSeen
-    ? `${secondsSinceCameraSeen}s ago`
-    : "Never";
-
-  // Show the History page instead of the dashboard when toggled on.
-  if (showHistory) {
-    return (
-      <div>
-        <div style={{ padding: "16px", backgroundColor: "#0f172a", textAlign: "center" }}>
-          <button
-            onClick={() => setShowHistory(false)}
-            style={{
-              padding: "10px 20px",
-              fontSize: "0.9rem",
-              fontWeight: "bold",
-              borderRadius: "10px",
-              border: "none",
-              cursor: "pointer",
-              backgroundColor: "#3b82f6",
-              color: "#ffffff"
-            }}
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
-        <DataHistory />
-      </div>
-    );
-  }
-
   return (
     <div style={{
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
@@ -211,22 +164,22 @@ function MainDashboard() {
         <h1 style={{ margin: "0 0 8px 0", color: "#38bdf8" }}>🌱 Automated System Dashboard</h1>
         <p style={{ margin: 0, color: "#94a3b8" }}>Live Monitoring & Hardware Control Portal</p>
 
-        <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
-          <div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "6px 14px",
-            borderRadius: "999px",
-            backgroundColor: isBoardOnline ? "rgba(74, 222, 128, 0.15)" : "rgba(248, 113, 113, 0.15)",
-            border: `1px solid ${isBoardOnline ? "#4ade80" : "#f87171"}`
-          }}>
-            <span style={{
-              width: "8px",
-              height: "8px",
-              borderRadius: "50%",
-              backgroundColor: isBoardOnline ? "#4ade80" : "#f87171"
-            }} />
+        <div style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "8px",
+          marginTop: "12px",
+          padding: "6px 14px",
+          borderRadius: "999px",
+          backgroundColor: isBoardOnline ? "rgba(74, 222, 128, 0.15)" : "rgba(248, 113, 113, 0.15)",
+          border: `1px solid ${isBoardOnline ? "#4ade80" : "#f87171"}`
+        }}>
+          <span style={{
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            backgroundColor: isBoardOnline ? "#4ade80" : "#f87171"
+          }} />
           <span style={{
             fontSize: "0.85rem",
             fontWeight: "bold",
@@ -237,52 +190,7 @@ function MainDashboard() {
           <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
             (last seen {lastSeenDisplay})
           </span>
-          </div>
-
-          <div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "6px 14px",
-            borderRadius: "999px",
-            backgroundColor: isCameraOnline ? "rgba(74, 222, 128, 0.15)" : "rgba(248, 113, 113, 0.15)",
-            border: `1px solid ${isCameraOnline ? "#4ade80" : "#f87171"}`
-          }}>
-            <span style={{
-              width: "8px",
-              height: "8px",
-              borderRadius: "50%",
-              backgroundColor: isCameraOnline ? "#4ade80" : "#f87171"
-            }} />
-            <span style={{
-              fontSize: "0.85rem",
-              fontWeight: "bold",
-              color: isCameraOnline ? "#4ade80" : "#f87171"
-            }}>
-              Camera {isCameraOnline ? "Online" : "Offline"}
-            </span>
-            <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-              (last seen {cameraLastSeenDisplay})
-            </span>
-          </div>
         </div>
-
-        <button
-          onClick={() => setShowHistory(true)}
-          style={{
-            marginTop: "14px",
-            padding: "8px 18px",
-            fontSize: "0.85rem",
-            fontWeight: "bold",
-            borderRadius: "10px",
-            border: "1px solid #475569",
-            cursor: "pointer",
-            backgroundColor: "#1e293b",
-            color: "#94a3b8"
-          }}
-        >
-          📊 View History
-        </button>
       </header>
 
       <main style={{
@@ -317,7 +225,7 @@ function MainDashboard() {
               <span style={{ color: "#38bdf8", fontSize: "0.9rem" }}>Capturing...</span>
             ) : latestImageUrl ? (
               <img
-                src={`${latestImageUrl}&t=${lastImageTimestamp}`}
+                src={`${latestImageUrl}?t=${lastImageTimestamp}`}
                 alt="Latest camera snapshot"
                 style={{ width: "100%", height: "100%", objectFit: "contain" }}
               />
@@ -361,33 +269,6 @@ function MainDashboard() {
               <span style={{ fontSize: "0.8rem", color: "#f87171" }}>⚠ {captureError}</span>
             )}
           </div>
-
-          {/* Recent Photos gallery — up to 5, newest first */}
-          {recentPhotos.length > 0 && (
-            <div style={{ marginTop: "16px" }}>
-              <p style={{ fontSize: "0.8rem", color: "#94a3b8", marginBottom: "8px" }}>
-                Recent photos
-              </p>
-              <div style={{ display: "flex", gap: "8px", overflowX: "auto" }}>
-                {recentPhotos.map((photo, i) => (
-                  <img
-                    key={photo.timestamp || i}
-                    src={`${photo.url}&t=${photo.timestamp}`}
-                    alt={`Capture ${i + 1}`}
-                    title={photo.timestamp ? new Date(photo.timestamp * 1000).toLocaleString() : ""}
-                    style={{
-                      width: "64px",
-                      height: "64px",
-                      objectFit: "cover",
-                      borderRadius: "8px",
-                      border: i === 0 ? "2px solid #38bdf8" : "1px solid #334155",
-                      flexShrink: 0
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
         </section>
 
         {/* --- CONTROLS & TELEMETRY --- */}
