@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../icons.jsx';
+import BusyBanner from '../BusyBanner.jsx';
 
 // Replaces the automation page. Every value here is read from and written to
 // the controller&rsquo;s configuration, so what is shown is what the hardware acts
@@ -77,6 +78,7 @@ export default function SettingsPage({ node }) {
 
   return (
     <section className="page">
+      <BusyBanner busy={node.busy ?? { active: false }} />
       <div className="page-head">
         <div className="kicker">Settings</div>
         <h1>What the controller acts on</h1>
@@ -296,6 +298,36 @@ export default function SettingsPage({ node }) {
             </span>
           </div>
         </div>
+      </div>
+
+      <div className="card card-pad" style={{ marginTop: 16 }}>
+        <div className="card-title"><Icon name="chart" size={14} /> Mount</div>
+        <p className="aut-desc" style={{ marginTop: 8 }}>
+          Aiming the mount is setup rather than everyday use, so it lives here
+          beside the other settings. A sweep always returns to the resting
+          position, so moving it by hand changes where every future sweep is
+          centred.
+        </p>
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <button className="btn btn-ghost"
+                  style={{ flex: 1, justifyContent: 'center', padding: '12px 10px' }}
+                  disabled={node.busy?.active}
+                  onClick={() => node.setMotor(-45)}>
+            <Icon name="chevL" size={16} /> Left 45&deg;
+          </button>
+          <button className="btn btn-ghost"
+                  style={{ flex: 1, justifyContent: 'center', padding: '12px 10px' }}
+                  disabled={node.busy?.active}
+                  onClick={() => node.setMotor(45)}>
+            Right 45&deg; <Icon name="chevR" size={16} />
+          </button>
+        </div>
+        <p className="aut-desc" style={{ marginTop: 10 }}>
+          Position is counted, not measured: there is no sensor on the shaft.
+          If the mount is knocked or a movement is interrupted, the stored angle
+          and the real one diverge, and the reference has to be set again at the
+          motor board with ZERO.
+        </p>
       </div>
 
       <div className="card card-pad" style={{ marginTop: 16 }}>

@@ -1,4 +1,5 @@
 import { Icon } from '../icons.jsx';
+import BusyBanner from '../BusyBanner.jsx';
 
 const QUICK = [
   ['analysis', 'pulse', 'Analysis', 'What the record shows'],
@@ -18,6 +19,7 @@ export default function OverviewPage({ node, go }) {
   } = node;
   return (
     <section className="page">
+      <BusyBanner busy={node.busy ?? { active: false }} />
       <div className="page-head">
         <div className="kicker">Overview</div>
         <h1>Plant status at a glance</h1>

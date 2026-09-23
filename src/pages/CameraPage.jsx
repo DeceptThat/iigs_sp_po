@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Icon } from '../icons.jsx';
+import BusyBanner from '../BusyBanner.jsx';
 
 // Photographs are kept in two stores, and the split is deliberate rather
 // than cosmetic. Routine frames are the system&rsquo;s own record, taken on a
@@ -23,6 +24,14 @@ export default function CameraPage({ node }) {
   } = node;
 
   const [folder, setFolder] = useState('routine');
+
+  // The routine sweep otherwise runs only on its own schedule, which during
+  // a demonstration means waiting for it. This asks for one immediately; the
+  // schedule is left alone, so the next scheduled sweep still happens when
+  // it was going to.
+  const busy = node.busy ?? { active: false };
+  const [sweepSpan, setSweepSpan] = useState(node.settings?.checkSpanDeg ?? 90);
+  const [sweepFrames, setSweepFrames] = useState(node.settings?.checkFrames ?? 3);
   const photos = folder === 'routine' ? routinePhotos : checkPhotos;
 
   // Routine frames carry the sweep they belong to, so they can be shown as
@@ -39,7 +48,8 @@ export default function CameraPage({ node }) {
   const lastSweep = surveyLog?.[0];
 
   return (
-    <section className="page">
+    <section className="page camera-page">
+      <BusyBanner busy={busy} />
       <div className="page-head">
         <div className="kicker">Camera</div>
         <h1>Stills, on a sweep</h1>
@@ -51,8 +61,8 @@ export default function CameraPage({ node }) {
         </p>
       </div>
 
-      <div className="grid-2" style={{ alignItems: 'start' }}>
-        <div className="card card-pad">
+      <div className="grid-2 camera-top-grid">
+        <div className="card card-pad camera-panel">
           <div className="card-title"><Icon name="camera" size={14} /> Latest frame</div>
 
           <div className="cam-frame" style={{ marginTop: 12 }}>
@@ -76,52 +86,81 @@ export default function CameraPage({ node }) {
             )}
           </div>
 
-          <div className="foot-meta" style={{ marginTop: 10 }}>
-            <span>{capturedAt ? `Captured at ${capturedAt}` : 'No capture yet'}</span>
-            {captureTimedOut && <span style={{ color: 'var(--crit)' }}>Timed out — the camera did not confirm</span>}
-            {captureError && !captureTimedOut && <span style={{ color: 'var(--crit)' }}>{captureError}</span>}
+          <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--muted)' }}>
+            {capturedAt ? `Captured at ${capturedAt}` : 'No capture yet'}
           </div>
+          {captureTimedOut && (
+            <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--crit)' }}>
+              Timed out — the camera did not confirm the upload.
+            </div>
+          )}
+          {captureError && !captureTimedOut && (
+            <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--crit)' }}>
+              {captureError}
+            </div>
+          )}
 
           <button className="btn btn-primary" style={{ marginTop: 14, width: '100%' }}
-                  onClick={requestCapture} disabled={showCapturing}>
+                  onClick={requestCapture} disabled={showCapturing || busy.active}>
             <Icon name="camera" size={16} /> {showCapturing ? 'Capturing…' : 'Capture a frame'}
           </button>
 
-          <div className="cam-controls" style={{ marginTop: 18 }}>
-            <div className="card-title">Mount</div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setMotor(-45)}>
-                <Icon name="chevL" size={16} /> 45°
-              </button>
-              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setMotor(45)}>
-                45° <Icon name="chevR" size={16} />
+          <div style={{ marginTop: 18 }}>
+            <div className="card-title">Sweep now</div>
+            <div className="sweep-now" style={{ marginTop: 12 }}>
+              <div className="field">
+                <label>Span</label>
+                <select value={sweepSpan} disabled={busy.active}
+                        onChange={(e) => setSweepSpan(Number(e.target.value))}>
+                  <option value={90}>90&deg;</option>
+                  <option value={180}>180&deg;</option>
+                  <option value={360}>360&deg;</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>Frames</label>
+                <select value={sweepFrames} disabled={busy.active}
+                        onChange={(e) => setSweepFrames(Number(e.target.value))}>
+                  {[2,3,4,5,6,7,8,9].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <button className="btn btn-ghost"
+                      style={{ flex: '1 1 140px', justifyContent: 'center' }}
+                      disabled={busy.active}
+                      onClick={() => node.runManualSweep(sweepSpan, sweepFrames)}>
+                <Icon name="camera" size={16} /> Sweep
               </button>
             </div>
-            <p className="aut-desc" style={{ marginTop: 10 }}>
-              Position is tracked by counting steps, with no sensor to confirm it.
-              If the mount is knocked or a movement is interrupted, the stored
-              angle and the real one diverge and it must be re-zeroed at the board.
+            <p className="busy-note">
+              {busy.active
+                ? 'The controller is busy. This will be available when it finishes.'
+                : `About ${Math.round((sweepFrames * 9 + (sweepSpan / 45) * 2) )} seconds. The mount returns to rest afterwards.`}
+            </p>
+            <p className="aut-desc" style={{ marginTop: 6 }}>
+              A sweep you ask for is filed with the check photographs and kept
+              until you delete it. The scheduled sweep is unaffected.
             </p>
           </div>
+
         </div>
 
-        <div className="card card-pad">
+        <div className="card card-pad camera-panel">
           <div className="card-title"><Icon name="chart" size={14} /> Sweeps</div>
           <div className="mini-stats" style={{ marginTop: 12 }}>
             <div className="mini-stat">
-              <span>routine</span>
-              <b className="mono">{settings.routineFrames} × {settings.routineSpanDeg}°</b>
+              <div className="k">routine</div>
+              <div className="v">{settings.routineFrames} frames · {settings.routineSpanDeg}°</div>
             </div>
             <div className="mini-stat">
-              <span>check</span>
-              <b className="mono">{settings.checkFrames} × {settings.checkSpanDeg}°</b>
+              <div className="k">check</div>
+              <div className="v">{settings.checkFrames} frames · {settings.checkSpanDeg}°</div>
             </div>
           </div>
 
           {lastSweep && (
             <div style={{ marginTop: 14 }}>
               <div className="card-title" style={{ fontSize: 13 }}>Last sweep</div>
-              <div className="foot-meta" style={{ marginTop: 6 }}>
+              <div className="foot-meta" style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
                 <span>{when(lastSweep.timestamp)}</span>
                 <span className={`badge ${lastSweep.ok ? 'ok' : 'warn'}`}>
                   {lastSweep.captured} of {lastSweep.expected} frames
@@ -143,8 +182,8 @@ export default function CameraPage({ node }) {
             <div className="mini-stats" style={{ marginTop: 8 }}>
               <div className="mini-stat"><div className="k">restarts</div><div className="v">{cameraHealth.bootCount ?? '—'}</div></div>
               <div className="mini-stat">
-                <span>uptime</span>
-                <b className="mono">{cameraHealth.uptimeSec != null ? `${Math.floor(cameraHealth.uptimeSec / 60)} min` : '—'}</b>
+                <div className="k">uptime</div>
+                <div className="v">{cameraHealth.uptimeSec != null ? `${Math.floor(cameraHealth.uptimeSec / 60)} min` : '—'}</div>
               </div>
             </div>
             <p className="aut-desc" style={{ marginTop: 10 }}>
@@ -178,8 +217,8 @@ export default function CameraPage({ node }) {
           <div style={{ display: 'grid', gap: 18 }}>
             {grouped.map(([setId, frames]) => (
               <div key={setId}>
-                <div className="foot-meta" style={{ marginBottom: 8 }}>
-                  <span>Sweep {setId}</span>
+                <div className="foot-meta" style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' }}>
+                  <span>Sweep {setId} ·</span>
                   <span>{when(frames[0]?.timestamp)} · {frames.length} frames</span>
                 </div>
                 <div className="gallery">

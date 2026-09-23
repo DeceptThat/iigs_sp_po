@@ -68,6 +68,7 @@ export function useGrowNode() {
   const [motorAngle, setMotorAngle] = useState(0);
   const [lightOn, setLightOn] = useState(false);
   const [checkPending, setCheckPending] = useState(false);
+  const [sweepPending, setSweepPending] = useState(false);
   const [sensorStatus, setSensorStatus] = useState('');
   const [lastWatered, setLastWatered] = useState(null);
   const [lastSeen, setLastSeen] = useState(null);
@@ -176,6 +177,7 @@ export function useGrowNode() {
       if (data.motor_angle !== undefined) setMotorAngle(data.motor_angle);
       if (data.light_on !== undefined) setLightOn(data.light_on === true);
       if (data.run_automation_check !== undefined) setCheckPending(data.run_automation_check === true);
+      if (data.run_sweep !== undefined) setSweepPending(data.run_sweep === true);
     });
 
     // Everything the firmware acts on. This is the source of truth for the
@@ -518,6 +520,31 @@ export function useGrowNode() {
     }
   };
 
+  // Asks the controller to run the routine sweep now. The schedule is left
+  // alone: the next scheduled sweep still happens when it was going to, which
+  // matters during a demonstration where the two would otherwise collide.
+  const runSweep = async () => {
+    try {
+      await set(ref(db, 'sensors/control/run_sweep'), true);
+    } catch (err) {
+      console.error('Error requesting sweep:', err);
+    }
+  };
+
+  const runManualSweep = async (spanDeg, frames) => {
+    try {
+      await update(ref(db, 'sensors/control'), {
+        manual_sweep_span_deg: spanDeg,
+        manual_sweep_frames: frames,
+        run_manual_sweep: true,
+      });
+      pushToast(`Sweep requested: ${frames} frames over ${spanDeg}\u00b0`);
+    } catch (err) {
+      console.error('Error requesting manual sweep:', err);
+      pushToast('Could not request the sweep');
+    }
+  };
+
   const toggleLight = async (next) => {
     try {
       await set(ref(db, 'sensors/control/light_on'), next === undefined ? !lightOn : !!next);
@@ -682,6 +709,20 @@ export function useGrowNode() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   // Everything the controller reported about itself at its last heartbeat.
+  const busy = useMemo(() => {
+    const what = system.activity ?? 'idle';
+    return {
+      active: what !== 'idle' && what !== '' && what != null,
+      what,
+      detail: system.activity_detail ?? '',
+      since: system.activity_since ?? null,
+      lastWhat: system.last_activity ?? null,
+      lastOutcome: system.last_outcome ?? null,
+      lastTookMs: system.last_activity_took_ms ?? null,
+      lastAt: system.last_activity_at ?? null,
+    };
+  }, [system]);
+
   const controllerHealth = useMemo(() => ({
     uptimeSec: system.uptime_s ?? null,
     freeHeap: system.free_heap ?? null,
@@ -709,6 +750,7 @@ export function useGrowNode() {
     motorAngle,
     lightOn,
     checkPending,
+    sweepPending,
     collectionInterval: settings.collectionIntervalMins,
     sensorStatus,
     lastWateredDisplay,
@@ -739,10 +781,13 @@ export function useGrowNode() {
     toasts,
     health,
     controllerHealth,
+    busy,
     cameraHealth,
     unreadCount,
     togglePump,
     runCheck,
+    runSweep,
+    runManualSweep,
     toggleLight,
     setMotor,
     requestCapture,
