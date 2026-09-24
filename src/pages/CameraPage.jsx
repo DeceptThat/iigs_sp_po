@@ -31,7 +31,6 @@ export default function CameraPage({ node }) {
   // it was going to.
   const busy = node.busy ?? { active: false };
   const [sweepSpan, setSweepSpan] = useState(node.settings?.checkSpanDeg ?? 90);
-  const [sweepFrames, setSweepFrames] = useState(node.settings?.checkFrames ?? 3);
   const photos = folder === 'routine' ? routinePhotos : checkPhotos;
 
   // Routine frames carry the sweep they belong to, so they can be shown as
@@ -117,23 +116,17 @@ export default function CameraPage({ node }) {
                   <option value={360}>360&deg;</option>
                 </select>
               </div>
-              <div className="field">
-                <select aria-label="Frames" value={sweepFrames} disabled={busy.active}
-                        onChange={(e) => setSweepFrames(Number(e.target.value))}>
-                  {[2,3,4,5,6,7,8,9].map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </div>
               <button className="btn btn-ghost"
                       style={{ flex: '1 1 140px', justifyContent: 'center' }}
                       disabled={busy.active}
-                      onClick={() => node.runManualSweep(sweepSpan, sweepFrames)}>
+                      onClick={() => node.runManualSweep(sweepSpan, settings.checkFrames)}>
                 <Icon name="camera" size={16} /> Sweep
               </button>
             </div>
             <p className="busy-note">
               {busy.active
                 ? 'The controller is busy. This will be available when it finishes.'
-                : `About ${Math.round((sweepFrames * 9 + (sweepSpan / 45) * 2) )} seconds. The mount returns to rest afterwards.`}
+                : `About ${Math.round((settings.checkFrames * 9 + (sweepSpan / 45) * 2) )} seconds. The mount returns to rest afterwards.`}
             </p>
             <p className="aut-desc" style={{ marginTop: 6 }}>
               A sweep you ask for is filed with the check photographs and kept
