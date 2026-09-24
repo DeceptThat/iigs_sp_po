@@ -18,7 +18,7 @@ export default function OverviewPage({ node, go }) {
     lightOn, checkPending, togglePump, runCheck, toggleLight,
   } = node;
   return (
-    <section className="page">
+    <section className="page overview-page">
       <BusyBanner busy={node.busy ?? { active: false }} />
       <div className="page-head">
         <div className="kicker">Overview</div>
@@ -62,8 +62,8 @@ export default function OverviewPage({ node, go }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', marginTop: 16 }}>
-        <div className="card card-pad">
+      <div className="overview-panels">
+        <div className="card card-pad overview-panel">
           <div className="card-title"><Icon name="home" size={14} /> Quick links</div>
           <div style={{ display: 'grid', gap: 10, marginTop: 14, marginBottom: 20 }}>
             <button className="btn btn-primary" onClick={runCheck} disabled={checkPending}>
@@ -96,7 +96,7 @@ export default function OverviewPage({ node, go }) {
             ))}
           </div>
         </div>
-        <div className="card card-pad">
+        <div className="card card-pad overview-panel">
           <div className="card-title"><Icon name="pulse" size={14} /> Recent activity</div>
           {activity.length === 0 ? (
             <div className="feed-empty">No activity yet — events appear when the pump, link, or alerts change.</div>

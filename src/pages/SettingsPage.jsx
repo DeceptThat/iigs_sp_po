@@ -39,6 +39,7 @@ function Toggle({ on, onChange }) {
 }
 
 export default function SettingsPage({ node }) {
+  const [motorStep, setMotorStep] = useState(45);
   const {
     settings, setSettings, saveSettings, saveSweep, saveNotificationPrefs,
     resetSettings, configLoaded, controllerHealth,
@@ -59,9 +60,7 @@ export default function SettingsPage({ node }) {
     await saveSettings(draft);
     await saveSweep({
       routine_span_deg: Number(draft.routineSpanDeg),
-      check_span_deg: Number(draft.checkSpanDeg),
       routine_frames: Number(draft.routineFrames),
-      check_frames: Number(draft.checkFrames),
       check_sweep_enabled: !!draft.checkSweepEnabled,
     });
     await saveNotificationPrefs({
@@ -77,7 +76,7 @@ export default function SettingsPage({ node }) {
   };
 
   return (
-    <section className="page">
+    <section className="page settings-page">
       <BusyBanner busy={node.busy ?? { active: false }} />
       <div className="page-head">
         <div className="kicker">Settings</div>
@@ -103,7 +102,7 @@ export default function SettingsPage({ node }) {
         </div>
       )}
 
-      <div className="grid-2" style={{ alignItems: 'start' }}>
+      <div className="settings-grid">
 
         {/* ------------------------------------------------ watering */}
         <div className="card card-pad">
@@ -183,6 +182,19 @@ export default function SettingsPage({ node }) {
               </div>
             </div>
 
+            <div className="aut-row">
+              <div className="aut-head">
+                <div className="aut-name">Test mode</div>
+                <Toggle on={draft.testMode} onChange={(v) => edit({ testMode: v })} />
+              </div>
+              <div className="aut-desc">
+                Shortens the schedule so the system can be watched without
+                waiting: a check every ten minutes and a sweep every thirty.
+                Switch it off before leaving the system running, or the
+                photograph store fills in about five hours.
+              </div>
+            </div>
+
             <Row
               name="History interval"
               value={`every ${draft.collectionIntervalMins} min`}
@@ -207,11 +219,6 @@ export default function SettingsPage({ node }) {
               <input type="range" min="20" max="50" value={draft.tempAlertHigh}
                 onChange={(e) => edit({ tempAlertHigh: +e.target.value })} />
             </Row>
-            <Row name="Humidity alert" value={`below ${draft.humidityAlertLow}%`}
-                 desc="Raised by this browser only. The controller has no humidity threshold, so this notification does not exist on the hardware.">
-              <input type="range" min="20" max="70" value={draft.humidityAlertLow}
-                onChange={(e) => edit({ humidityAlertLow: +e.target.value })} />
-            </Row>
           </div>
         </div>
 
@@ -230,33 +237,41 @@ export default function SettingsPage({ node }) {
               </div>
             </div>
 
+            <Row name="How often a sweep runs"
+                 value={draft.testMode ? 'every 30 min (test)' : `every ${draft.surveyIntervalH} h`}
+                 desc="Scheduled photographic sweeps. Test mode overrides this with a fixed thirty minutes.">
+              <select className="sel" value={draft.surveyIntervalH}
+                      disabled={draft.testMode}
+                      onChange={(e) => edit({ surveyIntervalH: +e.target.value })}>
+                <option value={1}>every hour</option>
+                <option value={3}>every 3 hours</option>
+                <option value={6}>every 6 hours</option>
+                <option value={12}>every 12 hours</option>
+                <option value={24}>once a day</option>
+              </select>
+            </Row>
             <Row name="Routine sweep span" value={`${draft.routineSpanDeg}°`}
                  desc="Total arc for the scheduled sweep, centred on the resting position.">
-              <input type="range" min="30" max="180" step="15" value={draft.routineSpanDeg}
-                onChange={(e) => edit({ routineSpanDeg: +e.target.value })} />
+              <select className="sel" value={draft.routineSpanDeg}
+                      onChange={(e) => edit({ routineSpanDeg: +e.target.value })}>
+                <option value={90}>90&deg;</option>
+                <option value={180}>180&deg;</option>
+                <option value={360}>360&deg;</option>
+              </select>
             </Row>
             <Row name="Routine sweep frames" value={`${draft.routineFrames} frames`}
                  desc="Spaced evenly across the span.">
-              <input type="range" min="2" max="9" value={draft.routineFrames}
-                onChange={(e) => edit({ routineFrames: +e.target.value })} />
-            </Row>
-            <Row name="Check sweep span" value={`${draft.checkSpanDeg}°`}
-                 desc="Total arc for the sweep after a manual check.">
-              <input type="range" min="30" max="180" step="15" value={draft.checkSpanDeg}
-                onChange={(e) => edit({ checkSpanDeg: +e.target.value })} />
-            </Row>
-            <Row name="Check sweep frames" value={`${draft.checkFrames} frames`}
-                 desc="Each frame adds five to ten seconds to the check.">
-              <input type="range" min="2" max="9" value={draft.checkFrames}
-                onChange={(e) => edit({ checkFrames: +e.target.value })} />
+              <select className="sel" value={draft.routineFrames}
+                      onChange={(e) => edit({ routineFrames: +e.target.value })}>
+                <option value={3}>3 frames</option>
+                <option value={5}>5 frames</option>
+              </select>
             </Row>
           </div>
           <div className="aut-note">
             <Icon name="shield" size={17} />
             <span>
-              Spans below thirty degrees overlap to no purpose, and above a
-              hundred and eighty the mount would pass its own cable. Values
-              outside those limits are ignored by the firmware.
+              A full rotation is offered because the firmware supports it, but the camera is tethered and the mount would wind its own cable. Nothing selects it until a slip ring is fitted.
             </span>
           </div>
         </div>
@@ -304,28 +319,45 @@ export default function SettingsPage({ node }) {
         <div className="card-title"><Icon name="chart" size={14} /> Mount</div>
         <p className="aut-desc" style={{ marginTop: 8 }}>
           Aiming the mount is setup rather than everyday use, so it lives here
-          beside the other settings. A sweep always returns to the resting
-          position, so moving it by hand changes where every future sweep is
-          centred.
+          beside the other settings. These act at once and are not part of the
+          save below. A sweep always returns to the resting position, so moving
+          the mount by hand changes where every future sweep is centred.
         </p>
-        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+
+        <div className="sweep-now" style={{ marginTop: 14 }}>
+          <div className="field" style={{ maxWidth: 130 }}>
+            <label>Degrees</label>
+            <input type="number" min="1" max="180" step="1"
+                   value={motorStep}
+                   disabled={node.busy?.active}
+                   onChange={(e) => {
+                     const v = Number(e.target.value);
+                     setMotorStep(Number.isFinite(v) ? Math.min(180, Math.max(1, v)) : 1);
+                   }} />
+          </div>
           <button className="btn btn-ghost"
-                  style={{ flex: 1, justifyContent: 'center', padding: '12px 10px' }}
+                  style={{ flex: '1 1 120px', justifyContent: 'center', padding: '12px 10px' }}
                   disabled={node.busy?.active}
-                  onClick={() => node.setMotor(-45)}>
-            <Icon name="chevL" size={16} /> Left 45&deg;
+                  onClick={() => node.setMotor(-motorStep)}>
+            <Icon name="chevL" size={16} /> Left {motorStep}&deg;
           </button>
           <button className="btn btn-ghost"
-                  style={{ flex: 1, justifyContent: 'center', padding: '12px 10px' }}
+                  style={{ flex: '1 1 120px', justifyContent: 'center', padding: '12px 10px' }}
                   disabled={node.busy?.active}
-                  onClick={() => node.setMotor(45)}>
-            Right 45&deg; <Icon name="chevR" size={16} />
+                  onClick={() => node.setMotor(motorStep)}>
+            Right {motorStep}&deg; <Icon name="chevR" size={16} />
           </button>
         </div>
+
         <p className="aut-desc" style={{ marginTop: 10 }}>
-          Position is counted, not measured: there is no sensor on the shaft.
-          If the mount is knocked or a movement is interrupted, the stored angle
-          and the real one diverge, and the reference has to be set again at the
+          Small steps for aiming, larger ones to swing the mount across. At four
+          revolutions a minute a ninety degree move takes about four seconds.
+        </p>
+
+        <p className="aut-desc" style={{ marginTop: 10 }}>
+          Position is counted, not measured: there is no sensor on the shaft. If
+          the mount is knocked or a movement is interrupted, the stored angle and
+          the real one diverge, and the reference has to be set again at the
           motor board with ZERO.
         </p>
       </div>
