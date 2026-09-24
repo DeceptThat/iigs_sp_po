@@ -118,8 +118,7 @@ export default function CameraPage({ node }) {
                 </select>
               </div>
               <div className="field">
-                <label>Frames</label>
-                <select value={sweepFrames} disabled={busy.active}
+                <select aria-label="Frames" value={sweepFrames} disabled={busy.active}
                         onChange={(e) => setSweepFrames(Number(e.target.value))}>
                   {[2,3,4,5,6,7,8,9].map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
