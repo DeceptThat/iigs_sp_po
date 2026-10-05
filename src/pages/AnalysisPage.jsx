@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Icon } from '../icons.jsx';
+import BusyBanner from '../BusyBanner.jsx';
 import LineChart from '../LineChart.jsx';
+import {
+  VPD_REF, vpd, findSegments, fitModel, rateAt, hoursToThreshold, describe, backtest,
+} from '../dryingModel.js';
+import { getProfile, coldStartRate } from '../plantProfiles.js';
 
 // Replaces the live monitor. A rolling ten-point window showed what was
 // happening at this instant; this page shows what the record says over a
@@ -29,6 +34,7 @@ function stats(values) {
 }
 
 function f1(n) { return Number(n).toFixed(1); }
+function f2(n) { return Number(n).toFixed(2); }
 
 export default function AnalysisPage({ node }) {
   const { historyReadings, automationLog, settings } = node;
@@ -93,18 +99,57 @@ export default function AnalysisPage({ node }) {
     };
   }, [automationLog, range]);
 
-  // How fast the soil dries between waterings, taken from consecutive falls
-  // in the trace. Rises are watering events and are excluded.
-  const dryingRate = useMemo(() => {
-    const rates = [];
-    for (let i = 1; i < readings.length; i++) {
-      const dv = readings[i].soil - readings[i - 1].soil;
-      const dtH = (readings[i].timestamp - readings[i - 1].timestamp) / 3600;
-      if (dv < 0 && dtH > 0 && dtH < 6) rates.push(-dv / dtH);
-    }
-    if (!rates.length) return null;
-    return rates.reduce((a, b) => a + b, 0) / rates.length;
-  }, [readings]);
+  // The fitted drying model. Deliberately computed over the WHOLE stored
+  // record rather than the selected range: the fit already weights older
+  // cycles down by a 21-day half-life, so narrowing the window throws away
+  // evidence the estimator would have discounted correctly on its own.
+  const model = useMemo(() => {
+    const rows = historyReadings
+      .filter((r) => Number.isFinite(r.timestamp) && Number.isFinite(r.soil))
+      .map((r) => ({
+        timestamp: r.timestamp,
+        soil_moisture_percent: r.soil,
+        temperature_c: r.temperature,
+        humidity_percent: r.humidity,
+      }));
+
+    // Cycles from a previous pot describe a different physical system and
+    // are excluded outright, not down-weighted.
+    const segments = findSegments(rows, { subjectEpoch: settings.subjectEpoch || 0 });
+    if (!segments.length) return null;
+
+    const now = Math.floor(Date.now() / 1000);
+
+    // The plant profile seeds the prior only. It carries no weight once real
+    // cycles exist, and it never touches the measured rate.
+    const profile = settings.plantMode === 'preset' ? getProfile(settings.plantType) : null;
+    const a0 = profile ? coldStartRate(profile) : undefined;
+    const fit = fitModel(segments, now, a0 != null ? { a0 } : {});
+
+    const latest = rows.at(-1);
+    const vpdNow = latest ? vpd(latest.temperature_c, latest.humidity_percent) : VPD_REF;
+    const soilNow = latest ? latest.soil_moisture_percent : null;
+    const threshold = settings.moistureThreshold;
+
+    // hoursToThreshold returns { hours, low, high }: low and high are the
+    // same countdown recomputed one residual standard deviation either side
+    // of the fitted rate, so the pair is a spread rather than a point claim.
+    const eta =
+      soilNow != null && Number.isFinite(vpdNow)
+        ? hoursToThreshold(fit, soilNow, threshold, vpdNow)
+        : null;
+
+    // Leave-one-out: refit without each cycle and predict it. Returns null
+    // below three cycles, where leaving one out leaves too little to fit.
+    const error = backtest(segments, now);
+
+    return {
+      segments, fit, eta, error,
+      vpdNow: Number.isFinite(vpdNow) ? vpdNow : null,
+      rateNow: Number.isFinite(vpdNow) ? rateAt(fit, vpdNow) : null,
+      note: describe(fit),
+    };
+  }, [historyReadings, settings.moistureThreshold, settings.plantMode, settings.plantType, settings.subjectEpoch]);
 
   const labels = readings.map((r) =>
     new Date(r.timestamp * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit' }));
@@ -113,6 +158,7 @@ export default function AnalysisPage({ node }) {
 
   return (
     <section className="page">
+      <BusyBanner busy={node.busy ?? { active: false }} />
       <div className="page-head">
         <div className="kicker">Analysis</div>
         <h1>What the record shows</h1>
@@ -227,12 +273,11 @@ export default function AnalysisPage({ node }) {
                       <div className="mini-stat"><div className="k">longest</div><div className="v">{f1(watering.longestH)} h</div></div>
                     </div>
                   )}
-                  {dryingRate != null && (
+                  {model?.rateNow != null && (
                     <p className="aut-desc" style={{ marginTop: 12 }}>
-                      Soil falls at about <b className="mono">{f1(dryingRate)}% per hour</b> between
-                      waterings. At the current threshold of {settings.moistureThreshold}% that
-                      implies roughly {f1((100 - settings.moistureThreshold) / dryingRate)} hours
-                      from saturated to dry.
+                      At present conditions the fitted model puts the drying rate at{' '}
+                      <b className="mono">{f2(model.rateNow)}% per hour</b>. The fit itself is
+                      below.
                     </p>
                   )}
                 </>
@@ -246,14 +291,134 @@ export default function AnalysisPage({ node }) {
           </div>
 
           <div className="card card-pad" style={{ marginTop: 16 }}>
+            <div className="card-title">
+              <Icon name="chart" size={14} /> Fitted drying model
+            </div>
+
+            {model ? (
+              <>
+                <div className="stat-value" style={{ marginTop: 10 }}>
+                  {f2(model.fit.a)}<small> % per hour</small>
+                </div>
+                <div className="stat-sub">
+                  at reference demand ({VPD_REF} kPa) &middot; fitted from {model.fit.n}{' '}
+                  {model.fit.n === 1 ? 'drying cycle' : 'drying cycles'} across the whole record
+                </div>
+
+                <div className="mini-stats" style={{ marginTop: 14 }}>
+                  <div className="mini-stat">
+                    <div className="k">sensitivity to demand</div>
+                    <div className="v">{f2(model.fit.b)} %/h per kPa</div>
+                  </div>
+                  <div className="mini-stat">
+                    <div className="k">measured, not assumed</div>
+                    <div className="v">{Math.round(model.fit.trust * 100)}%</div>
+                  </div>
+                  <div className="mini-stat">
+                    <div className="k">demand spread seen</div>
+                    <div className="v">{f2(model.fit.spread)} kPa</div>
+                  </div>
+                  {model.error && (
+                    <div className="mini-stat">
+                      <div className="k">leave-one-out error</div>
+                      <div className="v">{(model.error.relative * 100).toFixed(1)}%</div>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 14, height: 6, borderRadius: 3,
+                    background: 'var(--line)', overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${Math.max(1.5, model.fit.trust * 100)}%`,
+                      height: '100%',
+                      background: model.fit.trust > 0.5 ? 'var(--ok)' : 'var(--warn)',
+                    }}
+                  />
+                </div>
+
+                <p className="aut-desc" style={{ marginTop: 10 }}>{model.note}</p>
+
+                {model.eta && Number.isFinite(model.eta.hours) && (
+                  <p className="aut-desc" style={{ marginTop: 10 }}>
+                    From the latest reading, the soil reaches the{' '}
+                    {settings.moistureThreshold}% threshold in{' '}
+                    <b className="mono">{f1(model.eta.hours)} hours</b> if conditions hold
+                    {Number.isFinite(model.eta.low) && Number.isFinite(model.eta.high) && (
+                      <> &mdash; between {f1(model.eta.low)} and {f1(model.eta.high)} hours
+                      across one standard deviation of the fitted rate</>
+                    )}.
+                  </p>
+                )}
+
+                <div className="table-scroll" style={{ marginTop: 16 }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Cycle began</th>
+                        <th>Hours</th>
+                        <th>Points</th>
+                        <th>Rate %/h</th>
+                        <th>r&sup2;</th>
+                        <th>VPD kPa</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {model.segments.map((sg) => (
+                        <tr key={sg.tStart}>
+                          <td>
+                            {new Date(sg.tStart * 1000).toLocaleString([], {
+                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                            })}
+                          </td>
+                          <td className="mono">{f1(sg.hours)}</td>
+                          <td className="mono">{sg.points}</td>
+                          <td className="mono">{f2(sg.rate)}</td>
+                          <td className="mono">{sg.r2.toFixed(3)}</td>
+                          <td className="mono">{f2(sg.vpd)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <div className="stat-sub" style={{ marginTop: 10 }}>
+                No clean drying cycle in the record yet. A cycle needs at least four
+                consecutive readings spanning three hours or more, with no watering
+                and no logging gap longer than three hours inside it.
+              </div>
+            )}
+          </div>
+
+          <div className="card card-pad" style={{ marginTop: 16 }}>
             <div className="card-title"><Icon name="bulb" size={14} /> How these figures are produced</div>
             <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 8 }}>
               Means, extremes and spread come from the stored readings directly.
               Watering counts come from the automation log rather than from the soil
               trace, because the log records what the controller decided while the
-              trace only shows what followed. The drying rate is the mean of
-              consecutive falls in soil moisture, excluding rises, which are
-              waterings.
+              trace only shows what followed.
+            </p>
+            <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 8 }}>
+              The drying model is fitted rather than averaged. The record is first cut
+              into drying cycles wherever soil moisture rises by three points or more,
+              which is a watering, or wherever readings are more than three hours apart,
+              which is a gap the trace cannot be assumed to bridge. Each cycle
+              contributes its own rate, weighted by how long it ran, how cleanly it fitted
+              a straight line, and how recent it is, with a twenty-one-day half-life so
+              that a pot whose roots have since grown does not keep voting.
+            </p>
+            <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 8 }}>
+              Two numbers come out. The rate at reference demand is determined by a single
+              cycle. The sensitivity to evaporative demand cannot be determined at all
+              unless conditions varied between cycles, however many cycles there are, so
+              it is reported with the share of it that is measured rather than assumed. A
+              low share is not a fault in the fit; it is the fit declining to claim a
+              figure the record cannot support.
             </p>
           </div>
         </>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../icons.jsx';
 import BusyBanner from '../BusyBanner.jsx';
+import { PLANT_PROFILES, getProfile, coldStartRate } from '../plantProfiles.js';
 
 // Replaces the automation page. Every value here is read from and written to
 // the controller&rsquo;s configuration, so what is shown is what the hardware acts
@@ -55,6 +56,31 @@ export default function SettingsPage({ node }) {
 
   const edit = (patch) => { setDraft((d) => ({ ...d, ...patch })); setDirty(true); };
 
+  const byPreset = draft.plantMode === 'preset';
+  const profile = byPreset ? getProfile(draft.plantType) : null;
+
+  // Choosing a profile resolves it into the same two numbers the manual
+  // sliders write. Nothing downstream — not the model, not the firmware —
+  // learns that a profile was involved.
+  const applyProfile = (id) => {
+    const pr = getProfile(id);
+    if (!pr) return;
+    edit({ plantType: id, moistureThreshold: pr.threshold, cooldownHours: pr.cooldownHours });
+  };
+
+  // Returning to manual keeps the resolved numbers, so switching modes never
+  // moves the plant's target by itself. The cooldown is clamped back into the
+  // slider's range, since a profile may legitimately exceed it.
+  const setMode = (mode) => {
+    if (mode === 'preset') {
+      const pr = getProfile(draft.plantType) || PLANT_PROFILES[0];
+      edit({ plantMode: 'preset', plantType: pr.id,
+             moistureThreshold: pr.threshold, cooldownHours: pr.cooldownHours });
+    } else {
+      edit({ plantMode: 'manual', cooldownHours: Math.min(24, draft.cooldownHours) });
+    }
+  };
+
   const save = async () => {
     setSettings(draft);
     await saveSettings(draft);
@@ -76,7 +102,7 @@ export default function SettingsPage({ node }) {
   };
 
   return (
-    <section className="page settings-page">
+    <section className="page">
       <BusyBanner busy={node.busy ?? { active: false }} />
       <div className="page-head">
         <div className="kicker">Settings</div>
@@ -102,7 +128,7 @@ export default function SettingsPage({ node }) {
         </div>
       )}
 
-      <div className="settings-grid">
+      <div className="grid-2" style={{ alignItems: 'start' }}>
 
         {/* ------------------------------------------------ watering */}
         <div className="card card-pad">
@@ -119,13 +145,148 @@ export default function SettingsPage({ node }) {
               </div>
             </div>
 
+            <div className="aut-row">
+              <div className="aut-head">
+                <div className="aut-name">How the target is set</div>
+              </div>
+              <div className="seg" style={{ marginTop: 8 }}>
+                <button className={!byPreset ? 'active' : ''} onClick={() => setMode('manual')}>
+                  Manual
+                </button>
+                <button className={byPreset ? 'active' : ''} onClick={() => setMode('preset')}>
+                  By plant type
+                </button>
+              </div>
+              <div className="aut-desc">
+                Manual is the original behaviour: you set the two numbers below
+                yourself. By plant type fills them from a profile instead. Both
+                write the same values to the controller, so switching modes
+                changes who decides the numbers, never what the hardware does
+                with them.
+              </div>
+            </div>
+
+            {byPreset && (
+              <div className="aut-row">
+                <div className="aut-head">
+                  <div className="aut-name">Plant type</div>
+                  <div className="aut-val mono">{profile ? profile.label : '—'}</div>
+                </div>
+                <select
+                  className="sel"
+                  value={draft.plantType}
+                  onChange={(e) => applyProfile(e.target.value)}
+                  style={{ width: '100%', marginTop: 8 }}
+                >
+                  {PLANT_PROFILES.map((pr) => (
+                    <option key={pr.id} value={pr.id}>
+                      {pr.label} — {pr.threshold}%, {pr.cooldownHours} h
+                    </option>
+                  ))}
+                </select>
+                {profile && (
+                  <div className="aut-desc">
+                    {profile.note} Before any drying cycle has been recorded the
+                    forecast starts from roughly{' '}
+                    <b className="mono">{coldStartRate(profile).toFixed(2)}% per hour</b>,
+                    taken from the published {profile.benchmarkDays}-day watering
+                    benchmark. Three observed cycles replace that guess almost
+                    entirely — the plant type never affects the measured rate.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Changing the pot changes the system being measured, so it has
+                to be declared. Nothing else can detect it: the readings look
+                continuous across a swap. */}
+            <div className="aut-row">
+              <div className="aut-head">
+                <div className="aut-name">Current plant</div>
+                <div className="aut-val mono">
+                  {draft.subjectEpoch
+                    ? new Date(draft.subjectEpoch * 1000).toLocaleDateString()
+                    : 'whole record'}
+                </div>
+              </div>
+              <div className="aut-desc">
+                The drying rate describes <i>this pot</i> — its substrate, its
+                volume, its roots. Cycles recorded before the date above belong
+                to a different plant and are excluded from the fit entirely,
+                rather than merely counting for less. Readings are never
+                deleted; they just stop feeding the model.
+              </div>
+
+              {/* The date is editable because a plant swap is noticed after it
+                  happens, not as it happens. Stamping the moment the button is
+                  pressed silently discards every cycle the new plant has
+                  already produced. Set it to when the pot actually changed. */}
+              <label className="aut-desc" style={{ display: 'block', marginTop: 10 }}>
+                Date this plant was installed
+                <input
+                  type="date"
+                  className="sel"
+                  style={{ display: 'block', marginTop: 6 }}
+                  max={new Date().toISOString().slice(0, 10)}
+                  // Built from LOCAL date parts, not toISOString(). toISOString
+                  // converts to UTC, so a Bangkok midnight (UTC+7) renders as
+                  // 17:00 the previous day and the field shows a date one day
+                  // earlier than the label beside it.
+                  value={
+                    draft.subjectEpoch
+                      ? (() => {
+                          const d = new Date(draft.subjectEpoch * 1000);
+                          const p = (n) => String(n).padStart(2, '0');
+                          return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+                        })()
+                      : ''
+                  }
+                  onChange={(e) => {
+                    if (!e.target.value) return edit({ subjectEpoch: 0 });
+                    // Local midnight, so a run that began that morning is kept.
+                    const at = Math.floor(new Date(`${e.target.value}T00:00:00`).getTime() / 1000);
+                    edit({ subjectEpoch: at });
+                  }}
+                />
+              </label>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-ghost"
+                  disabled={node.busy?.active}
+                  onClick={() => {
+                    if (window.confirm(
+                      'Record a new plant as of today?\n\nEvery drying cycle learned '
+                      + 'so far stops counting, and the forecast returns to the '
+                      + 'plant-type prior until new cycles are observed. History is kept.',
+                    )) node.startNewSubject();
+                  }}
+                >
+                  I changed the plant today
+                </button>
+                {draft.subjectEpoch > 0 && (
+                  <button
+                    className="btn btn-ghost"
+                    disabled={node.busy?.active}
+                    onClick={() => edit({ subjectEpoch: 0 })}
+                  >
+                    Use the whole record
+                  </button>
+                )}
+              </div>
+            </div>
+
             <Row
               name="Moisture threshold"
               value={`${draft.moistureThreshold}%`}
-              desc="Water below this. The sensor board&rsquo;s failsafe uses its own lower, fixed value and ignores this one."
+              desc={byPreset
+                ? 'Set by the plant type above. Switch to Manual to override it.'
+                : 'Water below this. The sensor board\u2019s failsafe uses its own lower, fixed value and ignores this one.'}
             >
-              <input type="range" min="10" max="90" value={draft.moistureThreshold}
-                onChange={(e) => edit({ moistureThreshold: +e.target.value })} />
+              {!byPreset && (
+                <input type="range" min="10" max="90" value={draft.moistureThreshold}
+                  onChange={(e) => edit({ moistureThreshold: +e.target.value })} />
+              )}
             </Row>
 
             <Row
@@ -140,10 +301,14 @@ export default function SettingsPage({ node }) {
             <Row
               name="Minimum interval between waterings"
               value={`${draft.cooldownHours} h`}
-              desc="Blocks a second watering inside this window, so a slow-responding probe cannot cause repeated watering."
+              desc={byPreset
+                ? 'Set by the plant type above. Profiles may exceed the manual slider\u2019s 24-hour range; switching back to Manual clamps it to 24.'
+                : 'Blocks a second watering inside this window, so a slow-responding probe cannot cause repeated watering.'}
             >
-              <input type="range" min="1" max="24" value={draft.cooldownHours}
-                onChange={(e) => edit({ cooldownHours: +e.target.value })} />
+              {!byPreset && (
+                <input type="range" min="1" max="24" value={draft.cooldownHours}
+                  onChange={(e) => edit({ cooldownHours: +e.target.value })} />
+              )}
             </Row>
 
             <Row

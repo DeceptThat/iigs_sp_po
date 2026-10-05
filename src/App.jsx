@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './icons.jsx';
 import { useGrowNode } from './useGrowNode.js';
+import logo from './Image/IIGS Logo.png';
 import OverviewPage from './pages/OverviewPage.jsx';
 import AnalysisPage from './pages/AnalysisPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
@@ -33,7 +34,7 @@ export default function App() {
     setPage(next);
     window.location.hash = `#/${next}`;
     setMenuOpen(false);
-    document.title = `${PAGES[next].title} — GrowNode`;
+    document.title = `${PAGES[next].title} — IIGS`;
   };
 
   useEffect(() => {
@@ -58,10 +59,12 @@ export default function App() {
     <div className="app">
       <div className={`scrim ${menuOpen ? 'show' : ''}`} onClick={() => setMenuOpen(false)} />
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
+        {/* The mark belongs here, once. A logo repeated on every page header
+            stops being identification and becomes decoration. */}
         <div className="brand">
-          <div className="brand-logo"><Icon name="leaf" size={20} /></div>
+          <img src={logo} alt="" className="ov-logo" />
           <div>
-            <div className="brand-name">GrowNode</div>
+            <div className="brand-name">IIGS</div>
             <div className="brand-tag">indoor plant monitor</div>
           </div>
         </div>

@@ -29,6 +29,20 @@ export const DEFAULTS = {
   tempAlertLow: 15,
   humidityAlertLow: 40,
   cooldownHours: 6,
+
+  // Watering target. 'manual' is the original behaviour and stays the
+  // default: the thresholds below are whatever the user set. 'preset' derives
+  // them from a plant profile instead. Either way the SAME two config fields
+  // reach the firmware, so the controller needs no change and cannot tell
+  // which mode produced the numbers it is acting on.
+  plantMode: 'manual',
+  plantType: 'houseplant',
+  // Unix seconds at which the CURRENT plant was installed. Drying cycles
+  // recorded before it belong to a different pot and are excluded from the
+  // fit entirely — see the SUBJECT EPOCH note in dryingModel.js. 0 means
+  // "no epoch set", which uses the whole record.
+  subjectEpoch: 0,
+  subjectLabel: '',
   failsafeHours: 6,
   collectionIntervalMins: 60,
   surveyIntervalH: 6,
@@ -196,6 +210,10 @@ export function useGrowNode() {
         tempAlertHigh: data.temp_max_c ?? cur.tempAlertHigh,
         tempAlertLow: data.temp_min_c ?? cur.tempAlertLow,
         cooldownHours: data.min_water_interval_hours ?? cur.cooldownHours,
+      plantMode: data.plant_mode ?? cur.plantMode,
+      plantType: data.plant_type ?? cur.plantType,
+      subjectEpoch: Number(data.subject_epoch ?? cur.subjectEpoch) || 0,
+      subjectLabel: data.subject_label ?? cur.subjectLabel,
         failsafeHours: data.failsafe_timeout_hours ?? cur.failsafeHours,
         collectionIntervalMins: data.collection_interval_mins ?? cur.collectionIntervalMins,
         surveyIntervalH: data.survey_interval_hours ?? cur.surveyIntervalH,
@@ -299,8 +317,24 @@ export function useGrowNode() {
           source: e.source,
           stages: st,
           collected: st[0] === 'T',
-          watered: st[1] === 'T' || st[1] === 'U',
-          wateredVerified: st[1] === 'T',
+          // The pump character is 'U' in TWO different situations, and they
+          // must not be conflated:
+          //
+          //   x U x  with a real reading  -> the pump WAS commanded and the
+          //                                 sensor board acked. No flow
+          //                                 sensing is fitted, so it is
+          //                                 recorded as unverified, never 'T'.
+          //
+          //   U U x                       -> Board C did not reply at all
+          //                                 (board_a_coordinator.ino:788).
+          //                                 The pump stage never ran. This is
+          //                                 "not applicable", not a watering.
+          //
+          // Counting the second case as a watering is what put 28 waterings
+          // on a day when automatic watering was switched off.
+          watered: st[1] === 'U' && st[0] !== 'U',
+          wateredVerified: st[1] === 'T',       // reserved; no flow sensor fitted
+          sensorNoReply: st[0] === 'U' && st[1] === 'U',
           collectionEnabled: st[2] === 'T',
         };
       }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -605,6 +639,15 @@ export function useGrowNode() {
         temp_max_c: Number(merged.tempAlertHigh),
         temp_min_c: Number(merged.tempAlertLow),
         min_water_interval_hours: Number(merged.cooldownHours),
+        // Recorded so the choice survives a reload and is visible to anyone
+        // reading the config. The firmware ignores both: it acts on the two
+        // resolved numbers above, exactly as it did before profiles existed.
+        plant_mode: merged.plantMode === 'preset' ? 'preset' : 'manual',
+        plant_type: String(merged.plantType || 'houseplant'),
+        // The firmware ignores keys it does not know, so these two are
+        // portal-only state that happens to live in the same node.
+        subject_epoch: Number(merged.subjectEpoch) || 0,
+        subject_label: String(merged.subjectLabel || ''),
         failsafe_timeout_hours: Number(merged.failsafeHours),
         collection_interval_mins: Number(merged.collectionIntervalMins),
         survey_interval_hours: Number(merged.surveyIntervalH),
@@ -635,6 +678,25 @@ export function useGrowNode() {
     } catch (err) {
       console.error('Error saving notification settings:', err);
     }
+  };
+
+  // Declares that the pot now in the rig is a new one. Everything the model
+  // learned about the previous plant stops counting from this moment — not
+  // less, but not at all. See the SUBJECT EPOCH note in dryingModel.js for
+  // why exclusion rather than down-weighting.
+  //
+  // The history itself is untouched: the old readings stay, they simply stop
+  // feeding the fit. That keeps the record whole for the report while
+  // stopping a pot that is no longer here from describing one that is.
+  const startNewSubject = async (label = '') => {
+    const at = Math.floor(Date.now() / 1000);
+    await saveSettings({ subjectEpoch: at, subjectLabel: String(label || '') });
+    pushToast(
+      'New plant recorded',
+      'The drying model is reset to its prior and will relearn from this pot.',
+      'ok',
+    );
+    return at;
   };
 
   const resetSettings = () => {
@@ -799,6 +861,7 @@ export function useGrowNode() {
     requestCapture,
     saveCollectionInterval,
     saveSettings,
+    startNewSubject,
     saveSweep,
     saveNotificationPrefs,
     resetSettings,

@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react';
 
-// Shows what the controller is doing, on every page.
-//
-// The controller runs one operation at a time, and a sweep occupies it for
-// the better part of a minute. Without this the portal looked as though it
-// had ignored a press: the button returned to normal, nothing visibly
-// happened, and the only way to tell the difference between busy and broken
-// was to wait.
 export default function BusyBanner({ busy }) {
   const [elapsed, setElapsed] = useState(0);
 
