@@ -7,10 +7,6 @@ import {
 } from '../dryingModel.js';
 import { getProfile, coldStartRate } from '../plantProfiles.js';
 
-// Replaces the live monitor. A rolling ten-point window showed what was
-// happening at this instant; this page shows what the record says over a
-// period, which is the question the readings were collected to answer.
-
 const RANGES = [
   { id: '1d',  label: 'Last 24 hours', hours: 24 },
   { id: '7d',  label: 'Last 7 days',   hours: 24 * 7 },
@@ -52,10 +48,6 @@ export default function AnalysisPage({ node }) {
   const hum  = useMemo(() => stats(readings.map((r) => r.humidity)), [readings]);
   const soil = useMemo(() => stats(readings.map((r) => r.soil)), [readings]);
 
-  // Continuity: how many of the readings the schedule should have produced
-  // actually arrived. A gap of more than twice the interval is counted as an
-  // interruption, the factor of two admitting one missed acquisition without
-  // inferring that the device failed.
   const continuity = useMemo(() => {
     if (readings.length < 2) return null;
     const spanSec = readings.at(-1).timestamp - readings[0].timestamp;
@@ -78,9 +70,6 @@ export default function AnalysisPage({ node }) {
     };
   }, [readings, settings.collectionIntervalMins]);
 
-  // Watering behaviour, read from the automation log rather than inferred
-  // from the soil trace. Each entry records whether watering was commanded,
-  // so the interval between them is a fact rather than an interpretation.
   const watering = useMemo(() => {
     const cutoff = range.hours ? Math.floor(Date.now() / 1000) - range.hours * 3600 : 0;
     const events = automationLog
@@ -99,10 +88,6 @@ export default function AnalysisPage({ node }) {
     };
   }, [automationLog, range]);
 
-  // The fitted drying model. Deliberately computed over the WHOLE stored
-  // record rather than the selected range: the fit already weights older
-  // cycles down by a 21-day half-life, so narrowing the window throws away
-  // evidence the estimator would have discounted correctly on its own.
   const model = useMemo(() => {
     const rows = historyReadings
       .filter((r) => Number.isFinite(r.timestamp) && Number.isFinite(r.soil))
@@ -113,15 +98,11 @@ export default function AnalysisPage({ node }) {
         humidity_percent: r.humidity,
       }));
 
-    // Cycles from a previous pot describe a different physical system and
-    // are excluded outright, not down-weighted.
     const segments = findSegments(rows, { subjectEpoch: settings.subjectEpoch || 0 });
     if (!segments.length) return null;
 
     const now = Math.floor(Date.now() / 1000);
 
-    // The plant profile seeds the prior only. It carries no weight once real
-    // cycles exist, and it never touches the measured rate.
     const profile = settings.plantMode === 'preset' ? getProfile(settings.plantType) : null;
     const a0 = profile ? coldStartRate(profile) : undefined;
     const fit = fitModel(segments, now, a0 != null ? { a0 } : {});
@@ -131,16 +112,11 @@ export default function AnalysisPage({ node }) {
     const soilNow = latest ? latest.soil_moisture_percent : null;
     const threshold = settings.moistureThreshold;
 
-    // hoursToThreshold returns { hours, low, high }: low and high are the
-    // same countdown recomputed one residual standard deviation either side
-    // of the fitted rate, so the pair is a spread rather than a point claim.
     const eta =
       soilNow != null && Number.isFinite(vpdNow)
         ? hoursToThreshold(fit, soilNow, threshold, vpdNow)
         : null;
 
-    // Leave-one-out: refit without each cycle and predict it. Returns null
-    // below three cycles, where leaving one out leaves too little to fit.
     const error = backtest(segments, now);
 
     return {
