@@ -9,9 +9,11 @@ import CameraPage from './pages/CameraPage.jsx';
 import HistoryPage from './pages/HistoryPage.jsx';
 import NotificationsPage from './pages/NotificationsPage.jsx';
 import TeamPage from './pages/TeamPage.jsx';
+import ReservoirPage from './pages/ReservoirPage.jsx';
 
 const PAGES = {
   overview: { title: 'Overview', icon: 'home' },
+  reservoir: { title: 'Reservoir', icon: 'droplet' },
   analysis: { title: 'Analysis', icon: 'pulse' },
   settings: { title: 'Settings', icon: 'sliders' },
   camera: { title: 'Camera', icon: 'camera' },
@@ -47,6 +49,7 @@ export default function App() {
 
   const Page = {
     overview: OverviewPage,
+    reservoir: ReservoirPage,
     analysis: AnalysisPage,
     settings: SettingsPage,
     camera: CameraPage,
@@ -70,7 +73,7 @@ export default function App() {
         </div>
         <nav className="nav">
           <div className="nav-label">Console</div>
-          {['overview', 'analysis', 'settings', 'camera', 'history', 'notifications'].map((key) => (
+          {['overview', 'reservoir', 'analysis', 'settings', 'camera', 'history', 'notifications'].map((key) => (
             <button key={key} className={`nav-btn ${page === key ? 'active' : ''}`} onClick={() => go(key)}>
               <Icon name={PAGES[key].icon} />
               <span>{PAGES[key].title}</span>

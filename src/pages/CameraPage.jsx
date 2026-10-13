@@ -2,12 +2,6 @@ import { useState } from 'react';
 import { Icon } from '../icons.jsx';
 import BusyBanner from '../BusyBanner.jsx';
 
-// Photographs are kept in two stores, and the split is deliberate rather
-// than cosmetic. Routine frames are the system&rsquo;s own record, taken on a
-// schedule and overwritten on a rotation so the store cannot grow. Check
-// frames are ones a person asked for, named by timestamp and kept until
-// deleted. Same camera, same angles; different reasons, different lifetimes.
-
 function when(ts) {
   if (!ts) return '';
   return new Date(ts * 1000).toLocaleString([], {
@@ -25,16 +19,10 @@ export default function CameraPage({ node }) {
 
   const [folder, setFolder] = useState('routine');
 
-  // The routine sweep otherwise runs only on its own schedule, which during
-  // a demonstration means waiting for it. This asks for one immediately; the
-  // schedule is left alone, so the next scheduled sweep still happens when
-  // it was going to.
   const busy = node.busy ?? { active: false };
   const [sweepSpan, setSweepSpan] = useState(node.settings?.checkSpanDeg ?? 90);
   const photos = folder === 'routine' ? routinePhotos : checkPhotos;
 
-  // Routine frames carry the sweep they belong to, so they can be shown as
-  // sets rather than as a flat run of pictures.
   const grouped = folder === 'routine'
     ? Object.entries(
         routinePhotos.reduce((acc, p) => {
@@ -186,7 +174,6 @@ export default function CameraPage({ node }) {
         </div>
       </div>
 
-      {/* -------------------------------------------------- the two stores */}
       <div className="card card-pad" style={{ marginTop: 16 }}>
         <div className="seg" style={{ marginBottom: 14 }}>
           <button className={folder === 'routine' ? 'active' : ''} onClick={() => setFolder('routine')}>
