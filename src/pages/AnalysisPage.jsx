@@ -2,10 +2,27 @@ import { useMemo, useState } from 'react';
 import { Icon } from '../icons.jsx';
 import BusyBanner from '../BusyBanner.jsx';
 import LineChart from '../LineChart.jsx';
-import {
-  VPD_REF, vpd, findSegments, fitModel, rateAt, hoursToThreshold, describe, backtest,
-} from '../dryingModel.js';
-import { getProfile, coldStartRate } from '../plantProfiles.js';
+import { vpd } from '../dryingModel.js';
+
+// NO FITTED MODEL ON THIS PAGE.
+//
+// This page used to fit a drying rate against vapour pressure deficit and
+// publish a time to the next watering. Both are gone, and the reason is in the
+// measurements rather than in the code.
+//
+// Soil is stored as an integer percentage. At the rates actually observed -
+// around 0.18 %/h once the pot is established - one least-significant digit is
+// roughly six hours of drying, so a segment needs about thirty hours before
+// its fall is large enough to fit a line through. Thirty hours spans more than
+// a full day/night cycle, which means every segment long enough to measure is
+// also long enough to average its own VPD back to the daily mean. Across the
+// whole record the usable segments land within a few hundredths of a kilopascal
+// of each other, and a response cannot be identified from points that do not
+// differ in the thing you are regressing against.
+//
+// What is left is description, and description is what the record supports:
+// how far the soil fell after each wetting event, how fast, and how straight.
+// Every number below was measured.
 
 const RANGES = [
   { id: '1d',  label: 'Last 24 hours', hours: 24 },
@@ -14,27 +31,117 @@ const RANGES = [
   { id: 'all', label: 'All readings',  hours: null },
 ];
 
+// Segmentation thresholds. Each is a measured quantity or a system setting,
+// not a tuned number - see the explanation card at the foot of the page.
+const RISE_PCT       = 10;        // a rise this large is water, not weather
+const ATTRIB_GAP_S   = 6 * 3600;  // the configured watering cooldown
+const MIN_PTS        = 4;
+const MIN_HOURS      = 3;
+const USABLE_DROP    = 3;         // below this the slope is quantisation noise
+const USABLE_HOURS   = 6;
+
+const C_SOIL = '#4f9d6e';
+const C_TEMP = '#cf7a4b';
+const C_HUM  = '#5f8fc9';
+const C_VPD  = '#7b6bd6';
+
 function stats(values) {
   const clean = values.filter((v) => typeof v === 'number' && !Number.isNaN(v));
   if (!clean.length) return null;
   const sum = clean.reduce((a, b) => a + b, 0);
   const mean = sum / clean.length;
   const variance = clean.reduce((a, b) => a + (b - mean) ** 2, 0) / clean.length;
-  return {
-    n: clean.length,
-    min: Math.min(...clean),
-    max: Math.max(...clean),
-    mean,
-    sd: Math.sqrt(variance),
-  };
+  return { n: clean.length, min: Math.min(...clean), max: Math.max(...clean), mean, sd: Math.sqrt(variance) };
 }
 
 function f1(n) { return Number(n).toFixed(1); }
 function f2(n) { return Number(n).toFixed(2); }
 
+// ---------------------------------------------------------------------------
+// Where one drying segment ends and the next begins.
+//
+// Two preparation steps, then four tests applied to each consecutive pair.
+// The rule was checked against the automation log: of the wetting events it
+// finds across the stored record, the ones that coincide with logged pump
+// activity are the ones the controller performed, and any that do not are
+// water that reached the pot some other way.
+// ---------------------------------------------------------------------------
+function analyseDrying(readings) {
+  //  1. Readings at either end of the probe's range are discarded. A
+  //     capacitive probe that has come out of the soil or lost its ground
+  //     reads at a rail, which is not a measurement of anything.
+  const pts = readings
+    .filter((r) => Number.isFinite(r.soil) && r.soil > 2 && r.soil < 100 && Number.isFinite(r.timestamp))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (pts.length < 5) return { med: [], bounds: [], segs: [] };
+
+  //  2. A median of five. It throws out a single wild reading outright where a
+  //     mean would let it move the answer, and it leaves a genuine step edge
+  //     exactly where it is - which matters, because the step is the feature
+  //     being detected.
+  const med = pts.map((p, i) => {
+    const w = pts.slice(Math.max(0, i - 2), i + 3).map((q) => q.soil).sort((a, b) => a - b);
+    return { t: p.timestamp, m: w[Math.floor(w.length / 2)], T: p.temperature, RH: p.humidity };
+  });
+
+  const bounds = [];
+  for (let i = 1; i < med.length; i++) {
+    const gap = med[i].t - med[i - 1].t;
+    const step = med[i].m - med[i - 1].m;
+    //  3. A gap longer than the watering cooldown ends the segment whatever
+    //     the step looks like: across a longer hole more than one watering
+    //     could have happened, so no single event can be claimed.
+    if (gap > ATTRIB_GAP_S)        bounds.push({ i, t: med[i].t, k: 'gap', d: step, h: gap / 3600 });
+    //  4. A rise of ten points is water added. The fastest drying anywhere in
+    //     the record is about 1 %/h, so half an hour moves the soil half a
+    //     point - and drying only ever moves downward.
+    else if (step >= RISE_PCT)     bounds.push({ i, t: med[i].t, k: 'wetting', d: step, h: gap / 3600 });
+    //  5. A fall of ten points is the instrument. Nothing removes a tenth of
+    //     the pot's water in half an hour.
+    else if (step <= -RISE_PCT)    bounds.push({ i, t: med[i].t, k: 'fault', d: step, h: gap / 3600 });
+    //  6. A shorter gap still ends the segment, because a slope fitted across
+    //     missing readings would be inventing them.
+    else if (gap > 2 * 1800)       bounds.push({ i, t: med[i].t, k: 'gap', d: step, h: gap / 3600 });
+  }
+
+  const edges = [0, ...bounds.map((b) => b.i), med.length];
+  const segs = [];
+  for (let e = 0; e < edges.length - 1; e++) {
+    const g = med.slice(edges[e], edges[e + 1]);
+    if (g.length < MIN_PTS) continue;
+    const hours = (g[g.length - 1].t - g[0].t) / 3600;
+    if (hours < MIN_HOURS) continue;
+
+    const n = g.length;
+    const x = g.map((q) => (q.t - g[0].t) / 3600);
+    const y = g.map((q) => q.m);
+    const mx = x.reduce((a, b) => a + b, 0) / n;
+    const my = y.reduce((a, b) => a + b, 0) / n;
+    const den = x.reduce((a, xi) => a + (xi - mx) ** 2, 0);
+    const slope = den ? x.reduce((a, xi, k) => a + (xi - mx) * (y[k] - my), 0) / den : 0;
+    const sst = y.reduce((a, yi) => a + (yi - my) ** 2, 0);
+    const sse = y.reduce((a, yi, k) => a + (yi - (my + slope * (x[k] - mx))) ** 2, 0);
+
+    const vs = g.map((q) => vpd(q.T, q.RH)).filter((v) => Number.isFinite(v));
+    const drop = g[0].m - g[g.length - 1].m;
+
+    segs.push({
+      i0: edges[e], i1: edges[e + 1] - 1,
+      t0: g[0].t, t1: g[g.length - 1].t,
+      hours, from: g[0].m, to: g[g.length - 1].m, drop,
+      rate: -slope, n,
+      r2: sst > 0 ? 1 - sse / sst : null,
+      vpd: vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null,
+      usable: drop >= USABLE_DROP && hours >= USABLE_HOURS,
+    });
+  }
+  return { med, bounds, segs };
+}
+
 export default function AnalysisPage({ node }) {
   const { historyReadings, automationLog, settings } = node;
   const [rangeId, setRangeId] = useState('7d');
+  const [allSegs, setAllSegs] = useState(false);
   const range = RANGES.find((r) => r.id === rangeId);
 
   const readings = useMemo(() => {
@@ -48,25 +155,34 @@ export default function AnalysisPage({ node }) {
   const hum  = useMemo(() => stats(readings.map((r) => r.humidity)), [readings]);
   const soil = useMemo(() => stats(readings.map((r) => r.soil)), [readings]);
 
+  const vpdSeries = useMemo(
+    () => readings.map((r) => {
+      const v = vpd(r.temperature, r.humidity);
+      return Number.isFinite(v) ? v : null;      // null leaves a gap, not a zero
+    }),
+    [readings],
+  );
+  const vpdStats = useMemo(() => stats(vpdSeries), [vpdSeries]);
+
+  const drying = useMemo(() => analyseDrying(readings), [readings]);
+  const usable = drying.segs.filter((s) => s.usable);
+  const wettings = drying.bounds.filter((b) => b.k === 'wetting');
+  const gaps = drying.bounds.filter((b) => b.k === 'gap');
+
   const continuity = useMemo(() => {
     if (readings.length < 2) return null;
     const spanSec = readings.at(-1).timestamp - readings[0].timestamp;
     const intervalSec = Math.max(60, (settings.collectionIntervalMins || 60) * 60);
     const expected = Math.max(1, Math.round(spanSec / intervalSec) + 1);
-    let gaps = 0;
-    let longest = 0;
+    let g = 0, longest = 0;
     for (let i = 1; i < readings.length; i++) {
       const d = readings[i].timestamp - readings[i - 1].timestamp;
-      if (d > intervalSec * 2) gaps++;
+      if (d > intervalSec * 2) g++;
       if (d > longest) longest = d;
     }
     return {
-      recorded: readings.length,
-      expected,
-      yield: readings.length / expected,
-      gaps,
-      longestGapMin: Math.round(longest / 60),
-      spanHours: spanSec / 3600,
+      recorded: readings.length, expected, yield: readings.length / expected,
+      gaps: g, longestGapMin: Math.round(longest / 60), spanHours: spanSec / 3600,
     };
   }, [readings, settings.collectionIntervalMins]);
 
@@ -76,59 +192,51 @@ export default function AnalysisPage({ node }) {
       .filter((e) => e.watered && e.timestamp >= cutoff)
       .sort((a, b) => a.timestamp - b.timestamp);
     if (events.length < 1) return { count: 0 };
-    const gaps = [];
-    for (let i = 1; i < events.length; i++) gaps.push((events[i].timestamp - events[i - 1].timestamp) / 3600);
-    const mean = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : null;
+    const g = [];
+    for (let i = 1; i < events.length; i++) g.push((events[i].timestamp - events[i - 1].timestamp) / 3600);
     return {
       count: events.length,
-      meanIntervalH: mean,
-      shortestH: gaps.length ? Math.min(...gaps) : null,
-      longestH: gaps.length ? Math.max(...gaps) : null,
+      meanIntervalH: g.length ? g.reduce((a, b) => a + b, 0) / g.length : null,
+      shortestH: g.length ? Math.min(...g) : null,
+      longestH: g.length ? Math.max(...g) : null,
       last: events.at(-1).timestamp,
     };
   }, [automationLog, range]);
 
-  const model = useMemo(() => {
-    const rows = historyReadings
-      .filter((r) => Number.isFinite(r.timestamp) && Number.isFinite(r.soil))
-      .map((r) => ({
-        timestamp: r.timestamp,
-        soil_moisture_percent: r.soil,
-        temperature_c: r.temperature,
-        humidity_percent: r.humidity,
-      }));
-
-    const segments = findSegments(rows, { subjectEpoch: settings.subjectEpoch || 0 });
-    if (!segments.length) return null;
-
-    const now = Math.floor(Date.now() / 1000);
-
-    const profile = settings.plantMode === 'preset' ? getProfile(settings.plantType) : null;
-    const a0 = profile ? coldStartRate(profile) : undefined;
-    const fit = fitModel(segments, now, a0 != null ? { a0 } : {});
-
-    const latest = rows.at(-1);
-    const vpdNow = latest ? vpd(latest.temperature_c, latest.humidity_percent) : VPD_REF;
-    const soilNow = latest ? latest.soil_moisture_percent : null;
-    const threshold = settings.moistureThreshold;
-
-    const eta =
-      soilNow != null && Number.isFinite(vpdNow)
-        ? hoursToThreshold(fit, soilNow, threshold, vpdNow)
-        : null;
-
-    const error = backtest(segments, now);
-
-    return {
-      segments, fit, eta, error,
-      vpdNow: Number.isFinite(vpdNow) ? vpdNow : null,
-      rateNow: Number.isFinite(vpdNow) ? rateAt(fit, vpdNow) : null,
-      note: describe(fit),
-    };
-  }, [historyReadings, settings.moistureThreshold, settings.plantMode, settings.plantType, settings.subjectEpoch]);
+  const fmtT = (ts, withTime = true) =>
+    new Date(ts * 1000).toLocaleString([], withTime
+      ? { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+      : { month: 'short', day: 'numeric' });
 
   const labels = readings.map((r) =>
     new Date(r.timestamp * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit' }));
+
+  // ---- the drying chart ----------------------------------------------------
+  // Soil as measured, the fitted slopes drawn as a second dashed series, and
+  // the wetting events as enlarged points. Three encodings, so the two lines
+  // are never told apart by colour alone.
+  const dryLabels = drying.med.map((p) =>
+    new Date(p.t * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit' }));
+
+  const fitSeries = useMemo(() => {
+    const a = new Array(drying.med.length).fill(null);
+    for (const s of usable) {
+      a[s.i0] = s.from;
+      a[s.i1] = s.to;
+      // Chart.js joins across nulls only when told to; the two endpoints alone
+      // would leave the line invisible, so fill the span linearly.
+      for (let i = s.i0 + 1; i < s.i1; i++) {
+        a[i] = s.from + ((s.to - s.from) * (i - s.i0)) / (s.i1 - s.i0);
+      }
+    }
+    return a;
+  }, [drying.med, usable]);
+
+  const wetRadius = useMemo(() => {
+    const a = new Array(drying.med.length).fill(0);
+    for (const b of wettings) a[b.i] = 6;
+    return a;
+  }, [drying.med, wettings]);
 
   const empty = readings.length === 0;
 
@@ -142,17 +250,13 @@ export default function AnalysisPage({ node }) {
           Summary statistics over the stored readings, with the continuity of the
           record reported alongside them. A mean computed over a series with gaps
           in it is not the same claim as one computed over a complete series, so
-          both are shown together.
+          both are shown together. Nothing here is projected forward.
         </p>
       </div>
 
       <div className="seg" style={{ marginBottom: 16 }}>
         {RANGES.map((r) => (
-          <button
-            key={r.id}
-            className={rangeId === r.id ? 'active' : ''}
-            onClick={() => setRangeId(r.id)}
-          >
+          <button key={r.id} className={rangeId === r.id ? 'active' : ''} onClick={() => setRangeId(r.id)}>
             {r.label}
           </button>
         ))}
@@ -167,9 +271,9 @@ export default function AnalysisPage({ node }) {
         <>
           <div className="grid-3">
             {[
-              { k: 'Temperature', s: temp, unit: '°C', colour: 'var(--temp)', icon: 'thermo' },
-              { k: 'Humidity',    s: hum,  unit: '%',  colour: 'var(--hum)',  icon: 'droplet' },
-              { k: 'Soil moisture', s: soil, unit: '%', colour: 'var(--soil)', icon: 'droplet' },
+              { k: 'Temperature', s: temp, unit: '°C', colour: C_TEMP, icon: 'thermo' },
+              { k: 'Humidity',    s: hum,  unit: '%',  colour: C_HUM,  icon: 'droplet' },
+              { k: 'Soil moisture', s: soil, unit: '%', colour: C_SOIL, icon: 'droplet' },
             ].map(({ k, s, unit, colour, icon }) => (
               <div className="card card-pad" key={k}>
                 <div className="card-title"><Icon name={icon} size={14} /> {k}</div>
@@ -193,21 +297,178 @@ export default function AnalysisPage({ node }) {
           <div className="card card-pad" style={{ marginTop: 16 }}>
             <div className="card-title"><Icon name="chart" size={14} /> Trend over the selected period</div>
             <div className="chart-legend" style={{ marginTop: 10 }}>
-              <span><i style={{ background: 'var(--temp)' }} />temperature</span>
-              <span><i style={{ background: 'var(--hum)' }} />humidity</span>
-              <span><i style={{ background: 'var(--soil)' }} />soil</span>
+              <span><i style={{ background: C_TEMP }} />temperature</span>
+              <span><i style={{ background: C_HUM }} />humidity</span>
+              <span><i style={{ background: C_SOIL }} />soil</span>
               <span className="legend-current">{readings.length} readings</span>
             </div>
             <LineChart
               labels={labels}
               datasets={[
-                { data: readings.map((r) => r.temperature), borderColor: '#cf7a4b', borderWidth: 2, pointRadius: 0, tension: 0.3 },
-                { data: readings.map((r) => r.humidity), borderColor: '#5f8fc9', borderWidth: 2, pointRadius: 0, tension: 0.3 },
-                { data: readings.map((r) => r.soil), borderColor: '#4f9d6e', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+                { data: readings.map((r) => r.temperature), borderColor: C_TEMP, borderWidth: 2, pointRadius: 0, tension: 0.3 },
+                { data: readings.map((r) => r.humidity), borderColor: C_HUM, borderWidth: 2, pointRadius: 0, tension: 0.3 },
+                { data: readings.map((r) => r.soil), borderColor: C_SOIL, borderWidth: 2, pointRadius: 0, tension: 0.3 },
               ]}
               min={0}
               max={100}
             />
+          </div>
+
+          {/* VPD gets its own frame and its own scale. Drawn against soil on a
+              shared axis it would suggest a relationship the record cannot
+              support, and the choice of right-hand scale would decide what the
+              relationship looked like. */}
+          <div className="card card-pad" style={{ marginTop: 16 }}>
+            <div className="card-title"><Icon name="chart" size={14} /> Evaporative demand</div>
+            <div className="chart-legend" style={{ marginTop: 10 }}>
+              <span><i style={{ background: C_VPD }} />vapour pressure deficit, kPa</span>
+              {vpdStats && (
+                <span className="legend-current">
+                  {f2(vpdStats.min)} – {f2(vpdStats.max)} kPa, spread {f2(vpdStats.max - vpdStats.min)}
+                </span>
+              )}
+            </div>
+            <LineChart
+              labels={labels}
+              datasets={[{ data: vpdSeries, borderColor: C_VPD, borderWidth: 2, pointRadius: 0, tension: 0.3, spanGaps: false }]}
+              min={0}
+              max={vpdStats ? Math.ceil(vpdStats.max * 2) / 2 : 2}
+              height={170}
+            />
+            <p className="aut-desc" style={{ marginTop: 10 }}>
+              Computed from the same readings by the Tetens relation, so it carries the
+              climate sensor&rsquo;s error and nothing more. It is plotted on its own
+              scale deliberately: two measures of different magnitude on one frame make
+              the comparison a matter of which axis you chose.
+            </p>
+          </div>
+
+          {/* ---------------- drying ---------------- */}
+          <div className="card card-pad" style={{ marginTop: 16 }}>
+            <div className="card-title"><Icon name="droplet" size={14} /> Drying since each wetting event</div>
+
+            {drying.med.length < 5 ? (
+              <div className="stat-sub" style={{ marginTop: 10 }}>
+                Not enough usable readings in this period. Try a longer range.
+              </div>
+            ) : (
+              <>
+                <div className="mini-stats" style={{ marginTop: 12 }}>
+                  <div className="mini-stat"><div className="k">wetting events</div><div className="v">{wettings.length}</div></div>
+                  <div className="mini-stat"><div className="k">segments</div><div className="v">{drying.segs.length}</div></div>
+                  <div className="mini-stat"><div className="k">measurable</div><div className="v">{usable.length}</div></div>
+                  <div className="mini-stat">
+                    <div className="k">rate</div>
+                    <div className="v">
+                      {usable.length
+                        ? `${f2(Math.min(...usable.map((s) => s.rate)))}–${f2(Math.max(...usable.map((s) => s.rate)))} %/h`
+                        : '—'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="chart-legend" style={{ marginTop: 14 }}>
+                  <span><i style={{ background: C_SOIL }} />soil, median-smoothed</span>
+                  <span><i style={{ background: C_TEMP }} />fitted drying slope (dashed)</span>
+                  <span className="legend-current">{gaps.length} gaps in the record</span>
+                </div>
+                <LineChart
+                  labels={dryLabels}
+                  datasets={[
+                    {
+                      data: drying.med.map((p) => p.m),
+                      borderColor: C_SOIL, borderWidth: 2, tension: 0.25,
+                      pointRadius: wetRadius,
+                      pointBackgroundColor: C_SOIL,
+                      pointBorderColor: '#fff',
+                      pointBorderWidth: 2,
+                    },
+                    {
+                      data: fitSeries,
+                      borderColor: C_TEMP, borderWidth: 2.5, pointRadius: 0,
+                      borderDash: [6, 3], spanGaps: false, tension: 0,
+                    },
+                  ]}
+                  min={0}
+                  max={100}
+                />
+
+                {wettings.length > 0 && (
+                  <p className="aut-desc" style={{ marginTop: 12 }}>
+                    {wettings.length === 1 ? 'One wetting event' : `${wettings.length} wetting events`} detected
+                    in this period:{' '}
+                    {wettings.map((b, i) => (
+                      <span key={b.t}>
+                        {i > 0 ? ', ' : ''}
+                        <b className="mono">{fmtT(b.t)}</b> (+{Math.round(b.d)} points)
+                      </span>
+                    ))}
+                    . Compare these against the automation log — a rise with no logged
+                    pump event is water that reached the pot some other way, and the
+                    record catching that is the detector working rather than failing.
+                  </p>
+                )}
+
+                <div className="table-scroll" style={{ marginTop: 16 }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Segment began</th><th>Hours</th><th>Soil</th><th>Drop</th>
+                        <th>Rate %/h</th><th>r&sup2;</th><th>VPD kPa</th><th>n</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(allSegs ? drying.segs : usable).map((s) => (
+                        <tr key={s.t0} style={s.usable ? undefined : { opacity: 0.6 }}>
+                          <td>{fmtT(s.t0)}</td>
+                          <td className="mono">{f1(s.hours)}</td>
+                          <td className="mono">{Math.round(s.from)} → {Math.round(s.to)}</td>
+                          <td className="mono">{Math.round(s.drop)}</td>
+                          <td className="mono">{s.usable ? f2(s.rate) : '—'}</td>
+                          <td className="mono">{s.r2 == null ? '—' : s.r2.toFixed(2)}</td>
+                          <td className="mono">{s.vpd == null ? '—' : f2(s.vpd)}</td>
+                          <td className="mono">{s.n}</td>
+                        </tr>
+                      ))}
+                      {(allSegs ? drying.segs : usable).length === 0 && (
+                        <tr><td colSpan={8} className="stat-sub">
+                          No segment in this period fell far enough to measure a rate.
+                        </td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {drying.segs.length > usable.length && (
+                  <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }}
+                          onClick={() => setAllSegs((v) => !v)}>
+                    {allSegs
+                      ? `Show only the ${usable.length} measurable`
+                      : `Show all ${drying.segs.length} segments`}
+                  </button>
+                )}
+
+                <p className="aut-desc" style={{ marginTop: 12 }}>
+                  A rate is withheld below {USABLE_DROP} points of fall or {USABLE_HOURS} hours.
+                  Soil is stored as a whole percentage, so a shorter segment moves by one or
+                  two digits and its slope is quantisation noise — which is why the discarded
+                  ones include impossible negative rates.
+                </p>
+
+                {usable.length >= 2 && (
+                  <div className="aut-note" style={{ marginTop: 12 }}>
+                    <Icon name="shield" size={17} />
+                    <span>
+                      <b>Rate and demand cannot be separated here.</b> The measurable
+                      segments differ in starting soil level as much as they differ in
+                      vapour pressure deficit, and with this many points neither can be
+                      held constant while the other varies. The range above is a measured
+                      range of drying rates, not a response to conditions.
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <div className="grid-2" style={{ marginTop: 16, alignItems: 'start' }}>
@@ -230,7 +491,9 @@ export default function AnalysisPage({ node }) {
                     A record is written only when a cloud transaction succeeds, so an
                     unbroken series is evidence that the system stayed reachable.
                     An interruption is counted where the gap exceeds twice the
-                    acquisition interval.
+                    acquisition interval — and every one of them also ends a drying
+                    segment, which is why the segment count above runs ahead of the
+                    number of waterings.
                   </p>
                 </>
               ) : <div className="stat-sub">not enough readings</div>}
@@ -249,13 +512,12 @@ export default function AnalysisPage({ node }) {
                       <div className="mini-stat"><div className="k">longest</div><div className="v">{f1(watering.longestH)} h</div></div>
                     </div>
                   )}
-                  {model?.rateNow != null && (
-                    <p className="aut-desc" style={{ marginTop: 12 }}>
-                      At present conditions the fitted model puts the drying rate at{' '}
-                      <b className="mono">{f2(model.rateNow)}% per hour</b>. The fit itself is
-                      below.
-                    </p>
-                  )}
+                  <p className="aut-desc" style={{ marginTop: 12 }}>
+                    Counted from the automation log, which records what the controller
+                    decided. The soil trace above counts something different — water
+                    arriving at the probe — and the two disagree whenever a pump ran
+                    without delivering, which is exactly the comparison worth making.
+                  </p>
                 </>
               ) : (
                 <div className="stat-sub" style={{ marginTop: 10 }}>
@@ -267,112 +529,7 @@ export default function AnalysisPage({ node }) {
           </div>
 
           <div className="card card-pad" style={{ marginTop: 16 }}>
-            <div className="card-title">
-              <Icon name="chart" size={14} /> Fitted drying model
-            </div>
-
-            {model ? (
-              <>
-                <div className="stat-value" style={{ marginTop: 10 }}>
-                  {f2(model.fit.a)}<small> % per hour</small>
-                </div>
-                <div className="stat-sub">
-                  at reference demand ({VPD_REF} kPa) &middot; fitted from {model.fit.n}{' '}
-                  {model.fit.n === 1 ? 'drying cycle' : 'drying cycles'} across the whole record
-                </div>
-
-                <div className="mini-stats" style={{ marginTop: 14 }}>
-                  <div className="mini-stat">
-                    <div className="k">sensitivity to demand</div>
-                    <div className="v">{f2(model.fit.b)} %/h per kPa</div>
-                  </div>
-                  <div className="mini-stat">
-                    <div className="k">measured, not assumed</div>
-                    <div className="v">{Math.round(model.fit.trust * 100)}%</div>
-                  </div>
-                  <div className="mini-stat">
-                    <div className="k">demand spread seen</div>
-                    <div className="v">{f2(model.fit.spread)} kPa</div>
-                  </div>
-                  {model.error && (
-                    <div className="mini-stat">
-                      <div className="k">leave-one-out error</div>
-                      <div className="v">{(model.error.relative * 100).toFixed(1)}%</div>
-                    </div>
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 14, height: 6, borderRadius: 3,
-                    background: 'var(--line)', overflow: 'hidden',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${Math.max(1.5, model.fit.trust * 100)}%`,
-                      height: '100%',
-                      background: model.fit.trust > 0.5 ? 'var(--ok)' : 'var(--warn)',
-                    }}
-                  />
-                </div>
-
-                <p className="aut-desc" style={{ marginTop: 10 }}>{model.note}</p>
-
-                {model.eta && Number.isFinite(model.eta.hours) && (
-                  <p className="aut-desc" style={{ marginTop: 10 }}>
-                    From the latest reading, the soil reaches the{' '}
-                    {settings.moistureThreshold}% threshold in{' '}
-                    <b className="mono">{f1(model.eta.hours)} hours</b> if conditions hold
-                    {Number.isFinite(model.eta.low) && Number.isFinite(model.eta.high) && (
-                      <> &mdash; between {f1(model.eta.low)} and {f1(model.eta.high)} hours
-                      across one standard deviation of the fitted rate</>
-                    )}.
-                  </p>
-                )}
-
-                <div className="table-scroll" style={{ marginTop: 16 }}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Cycle began</th>
-                        <th>Hours</th>
-                        <th>Points</th>
-                        <th>Rate %/h</th>
-                        <th>r&sup2;</th>
-                        <th>VPD kPa</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {model.segments.map((sg) => (
-                        <tr key={sg.tStart}>
-                          <td>
-                            {new Date(sg.tStart * 1000).toLocaleString([], {
-                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                            })}
-                          </td>
-                          <td className="mono">{f1(sg.hours)}</td>
-                          <td className="mono">{sg.points}</td>
-                          <td className="mono">{f2(sg.rate)}</td>
-                          <td className="mono">{sg.r2.toFixed(3)}</td>
-                          <td className="mono">{f2(sg.vpd)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            ) : (
-              <div className="stat-sub" style={{ marginTop: 10 }}>
-                No clean drying cycle in the record yet. A cycle needs at least four
-                consecutive readings spanning three hours or more, with no watering
-                and no logging gap longer than three hours inside it.
-              </div>
-            )}
-          </div>
-
-          <div className="card card-pad" style={{ marginTop: 16 }}>
-            <div className="card-title"><Icon name="bulb" size={14} /> How these figures are produced</div>
+            <div className="card-title"><Icon name="bulb" size={14} /> How a segment is divided</div>
             <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 8 }}>
               Means, extremes and spread come from the stored readings directly.
               Watering counts come from the automation log rather than from the soil
@@ -380,21 +537,46 @@ export default function AnalysisPage({ node }) {
               trace only shows what followed.
             </p>
             <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 8 }}>
-              The drying model is fitted rather than averaged. The record is first cut
-              into drying cycles wherever soil moisture rises by three points or more,
-              which is a watering, or wherever readings are more than three hours apart,
-              which is a gap the trace cannot be assumed to bridge. Each cycle
-              contributes its own rate, weighted by how long it ran, how cleanly it fitted
-              a straight line, and how recent it is, with a twenty-one-day half-life so
-              that a pot whose roots have since grown does not keep voting.
+              Before any segment is cut, readings at either end of the probe&rsquo;s range
+              are discarded — a capacitive probe that has come out of the soil or lost its
+              ground reads at a rail — and what survives is smoothed with a median of five,
+              which discards a single wild reading outright where a mean would let it move
+              the answer, and which leaves a real step edge where it is.
             </p>
-            <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 8 }}>
-              Two numbers come out. The rate at reference demand is determined by a single
-              cycle. The sensitivity to evaporative demand cannot be determined at all
-              unless conditions varied between cycles, however many cycles there are, so
-              it is reported with the share of it that is measured rather than assumed. A
-              low share is not a fault in the fit; it is the fit declining to claim a
-              figure the record cannot support.
+            <div className="table-scroll" style={{ marginTop: 10 }}>
+              <table>
+                <thead><tr><th>Test</th><th style={{ textAlign: 'left' }}>Boundary</th><th style={{ textAlign: 'left' }}>Why that threshold</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td className="mono">gap &gt; 6 h</td><td>gap</td>
+                    <td>Six hours is the configured watering cooldown. Across a longer hole
+                        more than one watering could have happened, so no single event can
+                        be claimed whatever the jump looks like.</td>
+                  </tr>
+                  <tr>
+                    <td className="mono">rise ≥ 10 pts</td><td>wetting</td>
+                    <td>The fastest drying measured anywhere is about 1 %/h, so half an hour
+                        moves the soil about half a point. Ten points is roughly twenty times
+                        that, and drying only ever moves downward.</td>
+                  </tr>
+                  <tr>
+                    <td className="mono">fall ≥ 10 pts</td><td>fault</td>
+                    <td>Nothing removes a tenth of the pot&rsquo;s water in half an hour. A
+                        fall that fast is the instrument, not the soil.</td>
+                  </tr>
+                  <tr>
+                    <td className="mono">gap &gt; 2 intervals</td><td>gap</td>
+                    <td>A missed sample. The segment ends because a slope fitted across the
+                        hole would be inventing the readings in between.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 10 }}>
+              Not one of those numbers is tuned. Ten points comes from the fastest drying
+              rate the record contains; six hours is a setting the controller already acts
+              on. The order matters too — testing for a gap before testing the size of the
+              jump files a watering that happened across a gap as a gap, and loses it.
             </p>
           </div>
         </>

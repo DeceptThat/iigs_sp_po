@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../icons.jsx';
 import BusyBanner from '../BusyBanner.jsx';
-import { PLANT_PROFILES, getProfile, coldStartRate } from '../plantProfiles.js';
+import { PLANT_PROFILES, getProfile } from '../plantProfiles.js';
 
  
  
@@ -40,7 +40,6 @@ function Toggle({ on, onChange }) {
 }
 
 export default function SettingsPage({ node }) {
-  const [motorStep, setMotorStep] = useState(45);
   const {
     settings, setSettings, saveSettings, saveSweep, saveNotificationPrefs,
     resetSettings, configLoaded, controllerHealth,
@@ -186,12 +185,10 @@ export default function SettingsPage({ node }) {
                 </select>
                 {profile && (
                   <div className="aut-desc">
-                    {profile.note} Before any drying cycle has been recorded the
-                    forecast starts from roughly{' '}
-                    <b className="mono">{coldStartRate(profile).toFixed(2)}% per hour</b>,
-                    taken from the published {profile.benchmarkDays}-day watering
-                    benchmark. Three observed cycles replace that guess almost
-                    entirely — the plant type never affects the measured rate.
+                    {profile.note} The profile sets the two numbers below and nothing
+                    else. It does not influence any measurement, and no drying rate is
+                    inferred from it — the analysis page reports what the probe recorded,
+                    whichever profile is selected here.
                   </div>
                 )}
               </div>
@@ -199,82 +196,6 @@ export default function SettingsPage({ node }) {
 
             
 
-
-            <div className="aut-row">
-              <div className="aut-head">
-                <div className="aut-name">Current plant</div>
-                <div className="aut-val mono">
-                  {draft.subjectEpoch
-                    ? new Date(draft.subjectEpoch * 1000).toLocaleDateString()
-                    : 'whole record'}
-                </div>
-              </div>
-              <div className="aut-desc">
-                The drying rate describes <i>this pot</i> — its substrate, its
-                volume, its roots. Cycles recorded before the date above belong
-                to a different plant and are excluded from the fit entirely,
-                rather than merely counting for less. Readings are never
-                deleted; they just stop feeding the model.
-              </div>
-
-              
-
-
-
-              <label className="aut-desc" style={{ display: 'block', marginTop: 10 }}>
-                Date this plant was installed
-                <input
-                  type="date"
-                  className="sel"
-                  style={{ display: 'block', marginTop: 6 }}
-                  max={new Date().toISOString().slice(0, 10)}
-                   
-                   
-                   
-                   
-                  value={
-                    draft.subjectEpoch
-                      ? (() => {
-                          const d = new Date(draft.subjectEpoch * 1000);
-                          const p = (n) => String(n).padStart(2, '0');
-                          return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-                        })()
-                      : ''
-                  }
-                  onChange={(e) => {
-                    if (!e.target.value) return edit({ subjectEpoch: 0 });
-                     
-                    const at = Math.floor(new Date(`${e.target.value}T00:00:00`).getTime() / 1000);
-                    edit({ subjectEpoch: at });
-                  }}
-                />
-              </label>
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
-                <button
-                  className="btn btn-ghost"
-                  disabled={node.busy?.active}
-                  onClick={() => {
-                    if (window.confirm(
-                      'Record a new plant as of today?\n\nEvery drying cycle learned '
-                      + 'so far stops counting, and the forecast returns to the '
-                      + 'plant-type prior until new cycles are observed. History is kept.',
-                    )) node.startNewSubject();
-                  }}
-                >
-                  I changed the plant today
-                </button>
-                {draft.subjectEpoch > 0 && (
-                  <button
-                    className="btn btn-ghost"
-                    disabled={node.busy?.active}
-                    onClick={() => edit({ subjectEpoch: 0 })}
-                  >
-                    Use the whole record
-                  </button>
-                )}
-              </div>
-            </div>
 
             <Row
               name="Moisture threshold"
@@ -419,15 +340,20 @@ export default function SettingsPage({ node }) {
                  desc="Total arc for the scheduled sweep, centred on the resting position.">
               <select className="sel" value={draft.routineSpanDeg}
                       onChange={(e) => edit({ routineSpanDeg: +e.target.value })}>
+                <option value={0}>0&deg; &mdash; no movement</option>
                 <option value={90}>90&deg;</option>
                 <option value={180}>180&deg;</option>
                 <option value={360}>360&deg;</option>
               </select>
             </Row>
-            <Row name="Routine sweep frames" value={`${draft.routineFrames} frames`}
-                 desc="Spaced evenly across the span.">
+            <Row name="Routine sweep frames"
+                 value={draft.routineFrames === 1 ? 'single frame' : `${draft.routineFrames} frames`}
+                 desc={draft.routineFrames === 1
+                   ? 'One frame at the resting position. The mount never moves for a routine capture, which keeps a mechanical failure out of the long-term record.'
+                   : 'Spaced evenly across the span.'}>
               <select className="sel" value={draft.routineFrames}
                       onChange={(e) => edit({ routineFrames: +e.target.value })}>
+                <option value={1}>1 frame &mdash; at rest, no movement</option>
                 <option value={3}>3 frames</option>
                 <option value={5}>5 frames</option>
               </select>
@@ -480,52 +406,10 @@ export default function SettingsPage({ node }) {
         </div>
       </div>
 
-      <div className="card card-pad" style={{ marginTop: 16 }}>
-        <div className="card-title"><Icon name="chart" size={14} /> Mount</div>
-        <p className="aut-desc" style={{ marginTop: 8 }}>
-          Aiming the mount is setup rather than everyday use, so it lives here
-          beside the other settings. These act at once and are not part of the
-          save below. A sweep always returns to the resting position, so moving
-          the mount by hand changes where every future sweep is centred.
-        </p>
-
-        <div className="sweep-now" style={{ marginTop: 14 }}>
-          <div className="field" style={{ maxWidth: 130 }}>
-            <label>Degrees</label>
-            <input type="number" min="1" max="180" step="1"
-                   value={motorStep}
-                   disabled={node.busy?.active}
-                   onChange={(e) => {
-                     const v = Number(e.target.value);
-                     setMotorStep(Number.isFinite(v) ? Math.min(180, Math.max(1, v)) : 1);
-                   }} />
-          </div>
-          <button className="btn btn-ghost"
-                  style={{ flex: '1 1 120px', justifyContent: 'center', padding: '12px 10px' }}
-                  disabled={node.busy?.active}
-                  onClick={() => node.setMotor(-motorStep)}>
-            <Icon name="chevL" size={16} /> Left {motorStep}&deg;
-          </button>
-          <button className="btn btn-ghost"
-                  style={{ flex: '1 1 120px', justifyContent: 'center', padding: '12px 10px' }}
-                  disabled={node.busy?.active}
-                  onClick={() => node.setMotor(motorStep)}>
-            Right {motorStep}&deg; <Icon name="chevR" size={16} />
-          </button>
-        </div>
-
-        <p className="aut-desc" style={{ marginTop: 10 }}>
-          Small steps for aiming, larger ones to swing the mount across. At four
-          revolutions a minute a ninety degree move takes about four seconds.
-        </p>
-
-        <p className="aut-desc" style={{ marginTop: 10 }}>
-          Position is counted, not measured: there is no sensor on the shaft. If
-          the mount is knocked or a movement is interrupted, the stored angle and
-          the real one diverge, and the reference has to be set again at the
-          motor board with ZERO.
-        </p>
-      </div>
+      {/* THE MOUNT PANEL HAS MOVED TO THE CAMERA PAGE.
+          Aiming the camera while unable to see what it is pointing at was the
+          wrong arrangement; the controls now sit beside the frame they affect,
+          with the tracked angle, Home, Set zero and Stop alongside them. */}
 
       <div className="card card-pad" style={{ marginTop: 16 }}>
         <div className="aut-actions">
