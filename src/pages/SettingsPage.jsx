@@ -3,11 +3,11 @@ import { Icon } from '../icons.jsx';
 import BusyBanner from '../BusyBanner.jsx';
 import { PLANT_PROFILES, getProfile, coldStartRate } from '../plantProfiles.js';
 
-// Replaces the automation page. Every value here is read from and written to
-// the controller&rsquo;s configuration, so what is shown is what the hardware acts
-// on. The previous page kept its thresholds in the browser, which meant the
-// number on screen and the number the plant was watered by could differ with
-// nothing to indicate it.
+ 
+ 
+ 
+ 
+ 
 
 function Row({ name, value, desc, children }) {
   return (
@@ -50,8 +50,8 @@ export default function SettingsPage({ node }) {
   const [dirty, setDirty] = useState(false);
   const [note, setNote] = useState('');
 
-  // Follow the controller while untouched, so a change made elsewhere shows
-  // here rather than being silently overwritten by a stale draft.
+   
+   
   useEffect(() => { if (!dirty) setDraft(settings); }, [settings, dirty]);
 
   const edit = (patch) => { setDraft((d) => ({ ...d, ...patch })); setDirty(true); };
@@ -59,18 +59,18 @@ export default function SettingsPage({ node }) {
   const byPreset = draft.plantMode === 'preset';
   const profile = byPreset ? getProfile(draft.plantType) : null;
 
-  // Choosing a profile resolves it into the same two numbers the manual
-  // sliders write. Nothing downstream — not the model, not the firmware —
-  // learns that a profile was involved.
+   
+   
+   
   const applyProfile = (id) => {
     const pr = getProfile(id);
     if (!pr) return;
     edit({ plantType: id, moistureThreshold: pr.threshold, cooldownHours: pr.cooldownHours });
   };
 
-  // Returning to manual keeps the resolved numbers, so switching modes never
-  // moves the plant's target by itself. The cooldown is clamped back into the
-  // slider's range, since a profile may legitimately exceed it.
+   
+   
+   
   const setMode = (mode) => {
     if (mode === 'preset') {
       const pr = getProfile(draft.plantType) || PLANT_PROFILES[0];
@@ -130,7 +130,7 @@ export default function SettingsPage({ node }) {
 
       <div className="grid-2" style={{ alignItems: 'start' }}>
 
-        {/* ------------------------------------------------ watering */}
+        
         <div className="card card-pad">
           <div className="card-title"><Icon name="droplet" size={14} /> Watering</div>
           <div style={{ marginTop: 14 }}>
@@ -197,9 +197,9 @@ export default function SettingsPage({ node }) {
               </div>
             )}
 
-            {/* Changing the pot changes the system being measured, so it has
-                to be declared. Nothing else can detect it: the readings look
-                continuous across a swap. */}
+            
+
+
             <div className="aut-row">
               <div className="aut-head">
                 <div className="aut-name">Current plant</div>
@@ -217,10 +217,10 @@ export default function SettingsPage({ node }) {
                 deleted; they just stop feeding the model.
               </div>
 
-              {/* The date is editable because a plant swap is noticed after it
-                  happens, not as it happens. Stamping the moment the button is
-                  pressed silently discards every cycle the new plant has
-                  already produced. Set it to when the pot actually changed. */}
+              
+
+
+
               <label className="aut-desc" style={{ display: 'block', marginTop: 10 }}>
                 Date this plant was installed
                 <input
@@ -228,10 +228,10 @@ export default function SettingsPage({ node }) {
                   className="sel"
                   style={{ display: 'block', marginTop: 6 }}
                   max={new Date().toISOString().slice(0, 10)}
-                  // Built from LOCAL date parts, not toISOString(). toISOString
-                  // converts to UTC, so a Bangkok midnight (UTC+7) renders as
-                  // 17:00 the previous day and the field shows a date one day
-                  // earlier than the label beside it.
+                   
+                   
+                   
+                   
                   value={
                     draft.subjectEpoch
                       ? (() => {
@@ -243,7 +243,7 @@ export default function SettingsPage({ node }) {
                   }
                   onChange={(e) => {
                     if (!e.target.value) return edit({ subjectEpoch: 0 });
-                    // Local midnight, so a run that began that morning is kept.
+                     
                     const at = Math.floor(new Date(`${e.target.value}T00:00:00`).getTime() / 1000);
                     edit({ subjectEpoch: at });
                   }}
@@ -332,7 +332,7 @@ export default function SettingsPage({ node }) {
           )}
         </div>
 
-        {/* ------------------------------------------------ recording */}
+        
         <div className="card card-pad">
           <div className="card-title"><Icon name="chart" size={14} /> Recording</div>
           <div style={{ marginTop: 14 }}>
@@ -387,7 +387,7 @@ export default function SettingsPage({ node }) {
           </div>
         </div>
 
-        {/* ------------------------------------------------ sweeps */}
+        
         <div className="card card-pad">
           <div className="card-title"><Icon name="camera" size={14} /> Photographic sweeps</div>
           <div style={{ marginTop: 14 }}>
@@ -441,7 +441,7 @@ export default function SettingsPage({ node }) {
           </div>
         </div>
 
-        {/* ------------------------------------------------ notifications */}
+        
         <div className="card card-pad">
           <div className="card-title"><Icon name="bell" size={14} /> Notifications</div>
           <div style={{ marginTop: 14 }}>

@@ -1,10 +1,10 @@
 import { Icon } from '../icons.jsx';
 
-// The page a reviewer reads to find out what was promised against what
-// exists. Every claim here is one the system can be made to demonstrate, and
-// where something was not built it says so plainly rather than describing it
-// as partial. A status table that overstates is worse than no table: a
-// reviewer who checks one row and finds it generous stops trusting the rest.
+ 
+ 
+ 
+ 
+ 
 
 const TEAM = [
   { initials: 'MP', cls: '',  name: 'Myat Phone Pyae',      role: 'Student ID 6530204' },
@@ -12,9 +12,9 @@ const TEAM = [
   { initials: 'NE', cls: 'c', name: 'Nan Ei Shwe Sin Hlaing', role: 'Student ID 6530231' },
 ];
 
-// implemented  demonstrated on the running system
-// partial      built and working, with a stated limit
-// descoped     not built, and why
+ 
+ 
+ 
 const STATUS = [
   ['Monitor temperature, humidity and soil moisture', 'implemented',
    'DHT22 and a calibrated capacitive probe, read on every cycle.'],
@@ -83,7 +83,7 @@ export default function TeamPage() {
         </p>
       </div>
 
-      {/* ---------------------------------------------- architecture */}
+      
       <div className="card card-pad" style={{ marginTop: 16 }}>
         <div className="card-title"><Icon name="shield" size={14} /> Four devices, not one</div>
         <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 8 }}>
@@ -117,7 +117,7 @@ export default function TeamPage() {
         </div>
       </div>
 
-      {/* ---------------------------------------------- stacks */}
+      
       <div className="grid-3" style={{ marginTop: 16 }}>
         <div className="card card-pad">
           <div className="card-title"><Icon name="zap" size={14} /> Hardware</div>
@@ -164,7 +164,7 @@ export default function TeamPage() {
         </div>
       </div>
 
-      {/* ---------------------------------------------- status */}
+      
       <div className="card card-pad" style={{ marginTop: 16 }}>
         <div className="card-title"><Icon name="chart" size={14} /> Proposal against the prototype</div>
         <p style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 8, marginBottom: 12 }}>
@@ -196,7 +196,7 @@ export default function TeamPage() {
         </div>
       </div>
 
-      {/* ---------------------------------------------- known limits */}
+      
       <div className="card card-pad" style={{ marginTop: 16 }}>
         <div className="card-title"><Icon name="alert" size={14} /> Known limits</div>
         <ul className="vp-list" style={{ marginTop: 8 }}>

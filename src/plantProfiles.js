@@ -1,17 +1,17 @@
-// Plant profiles.
-//
-// A profile sets the TARGET. It never sets the rate.
-//
-// The drying model measures the pot — substrate, pot volume, root mass, leaf
-// area, all folded into one observed rate — and knows nothing about the
-// species. Choosing a profile moves the number the forecast counts down to.
-// It does not change, and cannot change, what the pot is observed to do.
-//
-// benchmarkDays is the published general watering interval for plants of this
-// kind. It exists for one purpose: to seed a drying rate before any cycle has
-// been observed, so a plant added today still gets a forecast today. Three
-// real cycles displace it almost entirely. It is a prior that evidence
-// overwrites, never a source of thresholds.
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
 
 export const PLANT_PROFILES = [
   {
@@ -70,9 +70,9 @@ export function getProfile(id) {
   return PLANT_PROFILES.find((p) => p.id === id) || null;
 }
 
-// Drying rate implied by the published benchmark, in percentage points per
-// hour: the span from saturated to this profile's threshold, spread across the
-// benchmark interval. Used as a0 only until real cycles exist.
+ 
+ 
+ 
 export function coldStartRate(profile) {
   if (!profile) return null;
   const span = Math.max(1, 100 - profile.threshold);

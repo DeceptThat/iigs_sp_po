@@ -1,36 +1,55 @@
 import { useMemo } from 'react';
 import { Icon } from '../icons.jsx';
 import BusyBanner from '../BusyBanner.jsx';
-import { vpd, findSegments, fitModel, hoursToThreshold } from '../dryingModel.js';
-import { getProfile, coldStartRate } from '../plantProfiles.js';
+import { vpd } from '../dryingModel.js';
 
-// A forecast has to clear TWO different tests, because they ask different
-// questions and passing one says nothing about the other.
-//
-//   trust  — "can the response to VPD be identified from these cycles at
-//            all, or is it still mostly the prior?"  Same interlock the
-//            controller uses.
-//
-//   width  — "how far apart are the ends of the prediction?"  The first
-//            version of this page checked only trust and printed
-//            "between 14.9 h and 52.6 days", which is not a forecast. A
-//            model can know perfectly well how VPD moves the rate and
-//            still scatter badly around it: identifiability and precision
-//            are independent, and a usable number needs both.
-//
-// Beyond MAX_ETA_SPREAD the interval is reported instead of a point, which
-// is honest about what is actually known.
-const TRUST_TO_FORECAST = 0.30;
-const MAX_ETA_SPREAD    = 3.0;   // high/low ratio
+const WETTING_RISE_PCT = 10;
+const ATTRIBUTABLE_GAP_S = 6 * 3600;
 
-function fmtHours(h) {
-  if (h == null || !Number.isFinite(h)) return null;
-  if (h < 1) return `${Math.round(h * 60)} min`;
+function dryingSinceWetting(readings) {
+  const pts = readings
+    .filter((r) => Number.isFinite(r.soil) && r.soil > 2 && r.soil < 100
+                   && Number.isFinite(r.timestamp))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (pts.length < 5) return null;
+
+  const med = pts.map((p, i) => {
+    const w = pts.slice(Math.max(0, i - 2), i + 3).map((q) => q.soil).sort((a, b) => a - b);
+    return { t: p.timestamp, m: w[Math.floor(w.length / 2)] };
+  });
+
+  let start = 0;
+  for (let i = 1; i < med.length; i++) {
+    const gap = med[i].t - med[i - 1].t;
+    const step = med[i].m - med[i - 1].m;
+    if (gap > ATTRIBUTABLE_GAP_S) start = i;
+    else if (step >= WETTING_RISE_PCT) start = i;
+    else if (step <= -WETTING_RISE_PCT) start = i;
+  }
+
+  const seg = med.slice(start);
+  if (seg.length < 4) return null;
+  const hours = (seg[seg.length - 1].t - seg[0].t) / 3600;
+  if (hours < 1) return null;
+
+  const drop = seg[0].m - seg[seg.length - 1].m;
+  return {
+    hours,
+    drop,
+    rate: drop / hours,
+    from: seg[0].m,
+    to: seg[seg.length - 1].m,
+    since: seg[0].t,
+    wetted: start > 0,
+  };
+}
+
+function fmtSpan(h) {
+  if (!Number.isFinite(h)) return '—';
   if (h < 48) return `${h.toFixed(1)} h`;
   return `${(h / 24).toFixed(1)} days`;
 }
 
-// Soil over the trailing window, drawn from the readings already in memory.
 function Sparkline({ readings, accent }) {
   const pts = useMemo(() => {
     if (!readings.length) return null;
@@ -72,44 +91,7 @@ export default function OverviewPage({ node, go }) {
   const threshold = Number(settings.moistureThreshold) || 50;
   const vpdNow = vpd(Number(temperature), Number(humidity));
 
-  // Fit over the WHOLE record, not the visible window — a drying cycle from
-  // last week is as informative as one from yesterday, subject to the
-  // recency weighting inside the model.
-  const model = useMemo(() => {
-    const rows = historyReadings.map((r) => ({
-      soil_moisture_percent: r.soil,
-      temperature_c: r.temperature,
-      humidity_percent: r.humidity,
-      timestamp: r.timestamp,
-    }));
-    const segments = findSegments(rows, { subjectEpoch: settings.subjectEpoch || 0 });
-    const profile = settings.plantMode === 'preset' ? getProfile(settings.plantType) : null;
-    const a0 = profile ? coldStartRate(profile) : undefined;
-    const now = Date.now() / 1000;
-    const fit = fitModel(segments, now, a0 != null ? { a0 } : {});
-    const eta =
-      Number.isFinite(soilMoisture) && soilMoisture > threshold && vpdNow != null
-        ? hoursToThreshold(fit, soilMoisture, threshold, vpdNow)
-        : null;
-    return { fit, eta, n: segments.length };
-  }, [historyReadings, settings.plantMode, settings.plantType, settings.subjectEpoch, soilMoisture, threshold, vpdNow]);
-
-  const trustOk = !model.fit.prior && model.fit.trust >= TRUST_TO_FORECAST;
-  const spread =
-    model.eta && model.eta.low != null && model.eta.high != null && model.eta.low > 0
-      ? model.eta.high / model.eta.low
-      : null;
-  const tightEnough = spread == null || spread <= MAX_ETA_SPREAD;
-  const canForecast = trustOk && model.eta && tightEnough;
-
-  // Why the forecast is withheld, in the user's terms rather than the model's.
-  const whyNoForecast = model.fit.prior
-    ? 'No drying cycles observed yet.'
-    : !trustOk
-      ? `Model confidence ${Math.round(model.fit.trust * 100)}% — too few cycles across too narrow a VPD range.`
-      : !tightEnough
-        ? `The estimate spans ${fmtHours(model.eta.low)} to ${fmtHours(model.eta.high)} — too wide to act on.`
-        : 'Soil is already at or below the threshold.';
+  const drying = useMemo(() => dryingSinceWetting(historyReadings), [historyReadings]);
 
   const last24 = useMemo(() => {
     const cutoff = Date.now() / 1000 - 24 * 3600;
@@ -121,15 +103,15 @@ export default function OverviewPage({ node, go }) {
   const soilPct = Number.isFinite(soilMoisture) ? Math.max(0, Math.min(100, soilMoisture)) : 0;
   const belowThreshold = Number.isFinite(soilMoisture) && soilMoisture <= threshold;
 
-  // Board B has no heartbeat of its own; the survey log is the only place its
-  // silence shows up, so that is what is reported rather than a guess.
+  const reservoirPct = Number.isFinite(node.reservoirPercent) ? node.reservoirPercent : null;
+  const reservoirMm = Number.isFinite(node.reservoirDepthMm) ? node.reservoirDepthMm : null;
+
   const motorSuspect = (controllerHealth.lastSurveyError || '').includes('motor');
 
   return (
     <section className="page ov">
       <BusyBanner busy={node.busy ?? { active: false }} />
 
-      {/* Warnings sit at the TOP and only exist when something is wrong. */}
       {!isBoardOnline && (
         <div className="ov-alert">
           <span className="ov-dot" aria-hidden="true" />
@@ -154,7 +136,6 @@ export default function OverviewPage({ node, go }) {
         </div>
       </header>
 
-      {/* HERO — soil is the quantity the system exists to control. */}
       <section className="card card-pad ov-hero">
         <div className="ov-hero-main">
           <div className="kicker">SOIL MOISTURE</div>
@@ -176,22 +157,25 @@ export default function OverviewPage({ node, go }) {
         </div>
 
         <div className="ov-hero-side">
-          {/* A forecast and a record are two different kinds of fact. */}
           <div className="ov-mini">
-            <div className="kicker">NEXT WATERING</div>
-            {canForecast ? (
+            <div className="kicker">DRIED SINCE WATERING</div>
+            {drying ? (
               <>
-                <div className="ov-mini-val">{fmtHours(model.eta.hours)}</div>
+                <div className="ov-mini-val">
+                  {drying.drop > 0 ? drying.drop.toFixed(0) : '0'}
+                  <small> pts</small>
+                </div>
                 <div className="ov-mini-sub">
-                  {model.eta.low != null && model.eta.high != null
-                    ? `between ${fmtHours(model.eta.low)} and ${fmtHours(model.eta.high)}`
-                    : `from ${model.n} observed cycles`}
+                  {`${drying.from.toFixed(0)}% → ${drying.to.toFixed(0)}% over ${fmtSpan(drying.hours)}`}
+                  {drying.hours >= 6 && drying.drop >= 3
+                    ? ` · ${drying.rate.toFixed(2)} %/h`
+                    : ' · too short to rate'}
                 </div>
               </>
             ) : (
               <>
-                <div className="ov-mini-val muted">Not forecastable</div>
-                <div className="ov-mini-sub">{whyNoForecast}</div>
+                <div className="ov-mini-val muted">—</div>
+                <div className="ov-mini-sub">Not enough readings since the last wetting event.</div>
               </>
             )}
           </div>
@@ -204,7 +188,6 @@ export default function OverviewPage({ node, go }) {
         </div>
       </section>
 
-      {/* Supporting measurements — inputs to the number above. */}
       <section className="ov-stats">
         <div className="card card-pad ov-stat">
           <div className="kicker">TEMPERATURE</div>
@@ -224,11 +207,17 @@ export default function OverviewPage({ node, go }) {
             {vpdNow != null ? vpdNow.toFixed(2) : '—'}<small> kPa</small>
           </div>
         </div>
-        {/* Honest empty state: Board A does not yet forward range_mm. */}
-        <div className="card card-pad ov-stat ov-stat-empty">
+        <div className={`card card-pad ov-stat ${reservoirPct == null ? 'ov-stat-empty' : ''}`}>
           <div className="kicker">RESERVOIR</div>
-          <div className="ov-stat-val muted">—</div>
-          <div className="ov-stat-sub">Not calibrated</div>
+          <div className={`ov-stat-val ${reservoirPct == null ? 'muted' : ''}`}>
+            {reservoirPct == null ? '—' : reservoirPct.toFixed(0)}
+            {reservoirPct != null && <small> %</small>}
+          </div>
+          <div className="ov-stat-sub">
+            {reservoirPct == null
+              ? 'Awaiting a calibrated reading'
+              : reservoirMm != null ? `${reservoirMm.toFixed(0)} mm of usable water` : 'of usable column'}
+          </div>
         </div>
       </section>
 
@@ -243,7 +232,6 @@ export default function OverviewPage({ node, go }) {
         <Sparkline readings={last24} accent="var(--accent)" />
       </section>
 
-      {/* Manual control: one click away, but not the headline. */}
       <section className="card card-pad ov-manual">
         <span className="kicker">MANUAL</span>
         <button className="btn btn-danger" onClick={togglePump} disabled={runPump}>
@@ -261,7 +249,6 @@ export default function OverviewPage({ node, go }) {
         </button>
       </section>
 
-      {/* Board health — the question that is expensive to answer any other way. */}
       <section className="card card-pad ov-boards">
         <span className="kicker">BOARDS</span>
         <span className={`ov-board ${isBoardOnline ? 'ok' : 'bad'}`}>

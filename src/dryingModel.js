@@ -1,15 +1,15 @@
-// Adaptive drying-rate model.
-//
-//   rate = a + b * (VPD - VPD_REF)      percentage points of soil moisture per hour
-//
-// `a` is what this pot does at reference conditions; `b` is how much faster it
-// dries as the air pulls harder. Both begin as priors and are drawn toward the
-// observations by weighted ridge regression.
-//
-// The pull on `b` is governed by how much VPD actually VARIES across the
-// observed segments, not by how many there are. A coefficient on a variable
-// that never moves cannot be identified, and the model reports that rather
-// than inventing a slope.
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
 
 export const VPD_REF = 1.3;
 
@@ -22,33 +22,33 @@ export function vpd(tempC, rhPercent) {
   return svp(tempC) * (1 - rhPercent / 100);
 }
 
-// Splits a time-ordered reading list into drying segments. A segment ends at a
-// rise in soil moisture (a watering) or a gap long enough that the intervening
-// behaviour is unknown.
-//
-// SUBJECT EPOCH
-//
-// `a` describes THIS pot — substrate, pot volume, root mass and leaf area all
-// folded into one observed rate. Replace the pot and every earlier segment
-// describes a different physical system.
-//
-// The recency weighting cannot absorb that. It was built for slow drift (soil
-// compacting, roots growing) with a 21-day half-life, and when the test
-// subject was replaced on 1 Oct 2026 it still gave 67-81 % weight to segments
-// from a pot that was no longer in the system. The fit was not merely
-// low-confidence; it was MIS-SPECIFIED.
-//
-// Pooling across the change is worse than it first looks. Subject 1 was
-// observed at VPD 0.69-1.08 kPa and subject 2 runs at 1.17-1.45. Pooled, that
-// is ~0.3 kPa of apparent spread and ~30 % trust — entirely an artifact of the
-// pot changing. Stated confidence would have RISEN as a wrong model
-// accumulated data, which is the worst failure a self-assessing estimator can
-// have, because the one number meant to catch the error reports the error as
-// progress.
-//
-// Segments before the epoch are therefore EXCLUDED, not down-weighted. A
-// weight can be overcome by volume; an exclusion cannot. The fit falls back
-// to coldStartRate(profile), which is exactly what the a0 prior exists for.
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
 export function findSegments(
   readings,
   { riseBreak = 3, maxGapHours = 3, subjectEpoch = 0 } = {},
@@ -81,7 +81,7 @@ function summarise(seg, { minPoints = 4, minHours = 3 } = {}) {
   const xs = seg.map(r => (r.timestamp - t0) / 3600);
   const ys = seg.map(r => r.soil_moisture_percent);
   const { slope, r2 } = ols(xs, ys);
-  if (!(slope < 0)) return null;                 // not drying
+  if (!(slope < 0)) return null;                  
 
   const vs = seg.map(r => vpd(r.temperature_c, r.humidity_percent)).filter(Number.isFinite);
   if (!vs.length) return null;
@@ -91,7 +91,7 @@ function summarise(seg, { minPoints = 4, minHours = 3 } = {}) {
     tEnd: seg[seg.length - 1].timestamp,
     hours,
     points: seg.length,
-    rate: -slope,                                 // positive %/hr
+    rate: -slope,                                  
     r2,
     vpd: vs.reduce((s, v) => s + v, 0) / vs.length,
     soilStart: ys[0],
@@ -117,10 +117,10 @@ function ols(xs, ys) {
 }
 
 const DEFAULTS = {
-  a0: 1.0,               // prior drying rate at VPD_REF, %/hr
-  b0: 0.70,              // prior sensitivity, %/hr per kPa
-  halfLifeDays: 21,      // older segments count for less: soil compacts, roots grow
-  spreadScale: 0.35,     // kPa of VPD spread taken as "enough to see the slope"
+  a0: 1.0,                
+  b0: 0.70,               
+  halfLifeDays: 21,       
+  spreadScale: 0.35,      
 };
 
 export function fitModel(segments, now = Date.now() / 1000, opts = {}) {
@@ -132,7 +132,7 @@ export function fitModel(segments, now = Date.now() / 1000, opts = {}) {
   const w = segments.map(s => {
     const ageDays = Math.max(0, (now - s.tEnd) / 86400);
     const recency = Math.pow(0.5, ageDays / o.halfLifeDays);
-    return s.hours * Math.max(0, s.r2) * recency;     // long, well-fitting, recent
+    return s.hours * Math.max(0, s.r2) * recency;      
   });
 
   const W = w.reduce((s, v) => s + v, 0);
@@ -164,7 +164,7 @@ export function fitModel(segments, now = Date.now() / 1000, opts = {}) {
   return {
     a, b, sd, spread,
     n: segments.length,
-    trust: sxx > 0 ? 1 - lamB / (lamB + sxx) : 0,   // 0 = all prior, 1 = all data
+    trust: sxx > 0 ? 1 - lamB / (lamB + sxx) : 0,    
     prior: false,
   };
 }
@@ -183,7 +183,7 @@ export function hoursToThreshold(model, soilNow, threshold, vpdNow) {
   return { hours: h, low: (soilNow - threshold) / lo, high: (soilNow - threshold) / hi };
 }
 
-// Honest one-line description of what the model currently knows.
+ 
 export function describe(model) {
   if (model.prior) return 'No drying cycles observed yet — using the reference values.';
   const t = Math.round(model.trust * 100);
@@ -200,7 +200,7 @@ export function describe(model) {
        + `The response to evaporative demand is measured from this plant (${t}%).`;
 }
 
-// Leave-one-out backtest: fit without each segment, predict it, measure the error.
+ 
 export function backtest(segments, now = Date.now() / 1000, opts = {}) {
   if (segments.length < 3) return null;
   const errs = segments.map((s, i) => {

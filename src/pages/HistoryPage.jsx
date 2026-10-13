@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Icon } from '../icons.jsx';
 
-// The stored record, summarised by day rather than listed row by row. A
-// thousand readings tell you very little as a table; the same readings
-// collapsed to a daily mean, with the extremes and the count beside it, tell
-// you what the week was like and where the gaps are.
+ 
+ 
+ 
+ 
 
 const RANGES = [
   { id: '7d',  label: 'Last 7 days',  days: 7 },
@@ -42,9 +42,9 @@ export default function HistoryPage({ node }) {
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [historyReadings, range]);
 
-  // Grouped by calendar day, newest first. The expected count per day comes
-  // from the acquisition interval, so a day with fewer readings than it
-  // should have is visible rather than merely shorter.
+   
+   
+   
   const days = useMemo(() => {
     const intervalMin = settings.collectionIntervalMins || 60;
     const perDay = Math.max(1, Math.round((24 * 60) / intervalMin));

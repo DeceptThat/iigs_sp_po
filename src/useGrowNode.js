@@ -2,26 +2,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onValue, ref, remove, set, update } from 'firebase/database';
 import { db } from './firebase.js';
 
-// Alert thresholds are no longer kept in the browser.
-//
-// They were, and it made the portal misleading: the threshold shown on the
-// Automation page was a value in localStorage, while the firmware watered
-// from a different value in sensors/config. Someone could set 35 here and
-// watch the plant water at 60, with nothing on screen to explain it.
-//
-// Everything the firmware acts on now lives in Firebase and is read back
-// from there. Only genuinely browser-local preferences remain below.
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
 const NOTIF_KEY = 'grownode.notifications';
 const LOCAL_KEY = 'grownode.local';
 
-// The firmware has no humidity threshold, so this one is display-only and
-// raises a notification in the portal without the hardware knowing of it.
+ 
+ 
 export const LOCAL_DEFAULTS = {
   humidityAlertLow: 40,
 };
 
-// Mirrors the firmware's compiled defaults, used until sensors/config loads
-// so the first render does not show zeros.
+ 
+ 
 export const DEFAULTS = {
   moistureThreshold: 60,
   waterDurationSec: 5,
@@ -30,17 +30,17 @@ export const DEFAULTS = {
   humidityAlertLow: 40,
   cooldownHours: 6,
 
-  // Watering target. 'manual' is the original behaviour and stays the
-  // default: the thresholds below are whatever the user set. 'preset' derives
-  // them from a plant profile instead. Either way the SAME two config fields
-  // reach the firmware, so the controller needs no change and cannot tell
-  // which mode produced the numbers it is acting on.
+   
+   
+   
+   
+   
   plantMode: 'manual',
   plantType: 'houseplant',
-  // Unix seconds at which the CURRENT plant was installed. Drying cycles
-  // recorded before it belong to a different pot and are excluded from the
-  // fit entirely — see the SUBJECT EPOCH note in dryingModel.js. 0 means
-  // "no epoch set", which uses the whole record.
+   
+   
+   
+   
   subjectEpoch: 0,
   subjectLabel: '',
   failsafeHours: 6,
@@ -104,7 +104,7 @@ export function useGrowNode() {
   const [motorLog, setMotorLog] = useState([]);
   const [live, setLive] = useState({ labels: [], temp: [], hum: [], soil: [] });
 
-  // Health and telemetry the boards report about themselves.
+   
   const [system, setSystem] = useState({});
   const [camera, setCamera] = useState({});
 
@@ -184,8 +184,8 @@ export function useGrowNode() {
       }
     });
 
-    // One-shot commands. The firmware clears each flag as soon as it picks
-    // the command up, so a flag still set means nobody has acted on it yet.
+     
+     
     const unsubControl = onValue(controlRef, (snap) => {
       const data = snap.val();
       if (!data) return;
@@ -196,8 +196,8 @@ export function useGrowNode() {
       if (data.run_sweep !== undefined) setSweepPending(data.run_sweep === true);
     });
 
-    // Everything the firmware acts on. This is the source of truth for the
-    // thresholds, not the browser.
+     
+     
     const unsubConfig = onValue(configRef, (snap) => {
       const data = snap.val();
       if (!data) return;
@@ -254,9 +254,9 @@ export function useGrowNode() {
       setCaptureError(data.captureError !== undefined ? data.captureError : null);
       if (data.last_seen !== undefined) setCameraLastSeen(data.last_seen);
 
-      // Photographs live in two stores with different shapes. Routine frames
-      // are grouped one folder per sweep, so they sit a level deeper than
-      // check frames, which are keyed by the timestamp in their filename.
+       
+       
+       
       const routine = [];
       if (data.routine) {
         Object.entries(data.routine).forEach(([setId, sweep]) => {
@@ -299,12 +299,12 @@ export function useGrowNode() {
       setHistoryReadings(list);
     });
 
-    // One entry per check the controller performs, whether or not it acted.
-    // The three characters record, in order, whether the reading was written
-    // to history, whether watering was commanded, and what the collection
-    // setting was. U means the state was not measured rather than measured
-    // as false: no delivery sensing is fitted, so a commanded watering is
-    // recorded as unverified.
+     
+     
+     
+     
+     
+     
     const unsubAutoLog = onValue(autoLogRef, (snap) => {
       const data = snap.val();
       if (!data) { setAutomationLog([]); return; }
@@ -317,23 +317,23 @@ export function useGrowNode() {
           source: e.source,
           stages: st,
           collected: st[0] === 'T',
-          // The pump character is 'U' in TWO different situations, and they
-          // must not be conflated:
-          //
-          //   x U x  with a real reading  -> the pump WAS commanded and the
-          //                                 sensor board acked. No flow
-          //                                 sensing is fitted, so it is
-          //                                 recorded as unverified, never 'T'.
-          //
-          //   U U x                       -> Board C did not reply at all
-          //                                 (board_a_coordinator.ino:788).
-          //                                 The pump stage never ran. This is
-          //                                 "not applicable", not a watering.
-          //
-          // Counting the second case as a watering is what put 28 waterings
-          // on a day when automatic watering was switched off.
+           
+           
+           
+           
+           
+           
+           
+           
+           
+           
+           
+           
+           
+           
+           
           watered: st[1] === 'U' && st[0] !== 'U',
-          wateredVerified: st[1] === 'T',       // reserved; no flow sensor fitted
+          wateredVerified: st[1] === 'T',        
           sensorNoReply: st[0] === 'U' && st[1] === 'U',
           collectionEnabled: st[2] === 'T',
         };
@@ -341,9 +341,9 @@ export function useGrowNode() {
       setAutomationLog(list);
     });
 
-    // Notifications raised by the firmware itself. Kept apart from the ones
-    // the portal raises, because these are what the hardware decided rather
-    // than what the browser noticed.
+     
+     
+     
     const unsubNotif = onValue(notifRef, (snap) => {
       const data = snap.val();
       if (!data) { setDeviceNotifications([]); return; }
@@ -362,9 +362,9 @@ export function useGrowNode() {
       setDeviceNotifications(list);
     });
 
-    // One entry per photographic sweep, whether or not it finished. A sweep
-    // that aborts still records how many frames it managed and why it
-    // stopped, so an incomplete set is explained rather than merely short.
+     
+     
+     
     const unsubSurvey = onValue(surveyRef, (snap) => {
       const data = snap.val();
       if (!data) { setSurveyLog([]); return; }
@@ -382,9 +382,9 @@ export function useGrowNode() {
       setSurveyLog(list);
     });
 
-    // Every commanded movement and whether the motor board acknowledged it.
-    // Position is tracked by counting steps with no sensor to confirm it, so
-    // this is a record of what was asked for, not of where the mount is.
+     
+     
+     
     const unsubMotor = onValue(motorRef, (snap) => {
       const data = snap.val();
       if (!data) { setMotorLog([]); return; }
@@ -423,9 +423,9 @@ export function useGrowNode() {
   const secondsSinceCameraSeen = cameraLastSeen ? Math.floor(nowTick / 1000) - cameraLastSeen : null;
   const isCameraOnline = secondsSinceCameraSeen !== null && secondsSinceCameraSeen < 90;
 
-  // A watering request, not the pump itself. The flag is cleared by the
-  // controller when it picks the command up, so the transition to false is
-  // the command being accepted rather than the pump stopping.
+   
+   
+   
   useEffect(() => {
     if (prev.current.pump === null) {
       prev.current.pump = runPump;
@@ -461,9 +461,9 @@ export function useGrowNode() {
     }
   }, [isBoardOnline, logEvent, pushNotif, pushToast]);
 
-  // Portal-side alerts. Temperature and soil are also watched by the
-  // firmware, which raises its own notifications on its own schedule; these
-  // appear sooner because the browser sees every reading as it arrives.
+   
+   
+   
   useEffect(() => {
     if (!configLoaded) return;
     const now = Date.now();
@@ -533,12 +533,12 @@ export function useGrowNode() {
   const captureTimedOut = isCapturing && captureElapsed !== null && captureElapsed > CAPTURE_TIMEOUT_SEC;
   const showCapturing = isCapturing && !captureTimedOut;
 
-  // ---------------------------------------------------------------- actions
+   
 
-  // A request, not a switch. The controller clears the flag as soon as it
-  // acts, so writing the opposite of the current value would cancel a
-  // watering that had just been asked for rather than start one. The pump
-  // runs for the configured duration and stops by itself.
+   
+   
+   
+   
   const togglePump = async () => {
     try {
       await set(ref(db, 'sensors/control/run_pump'), true);
@@ -547,9 +547,9 @@ export function useGrowNode() {
     }
   };
 
-  // The full cycle: read the sensors, apply the threshold, water only if the
-  // soil is actually dry, and log the outcome. Distinct from the pump, which
-  // waters whatever the reading says.
+   
+   
+   
   const runCheck = async () => {
     try {
       await set(ref(db, 'sensors/control/run_automation_check'), true);
@@ -558,9 +558,9 @@ export function useGrowNode() {
     }
   };
 
-  // Asks the controller to run the routine sweep now. The schedule is left
-  // alone: the next scheduled sweep still happens when it was going to, which
-  // matters during a demonstration where the two would otherwise collide.
+   
+   
+   
   const runSweep = async () => {
     try {
       await set(ref(db, 'sensors/control/run_sweep'), true);
@@ -599,9 +599,9 @@ export function useGrowNode() {
     }
   };
 
-  // The camera reads its target and frame numbers alongside the request, so
-  // all four are written together. A set of -1 marks an ungrouped capture,
-  // which the camera files by timestamp among the check photographs.
+   
+   
+   
   const requestCapture = async () => {
     try {
       await update(ref(db, 'sensors/camera/control'), {
@@ -624,9 +624,9 @@ export function useGrowNode() {
     }
   };
 
-  // Written to Firebase, so what is shown here and what the firmware waters
-  // by cannot drift apart. Only humidityAlertLow stays in the browser, since
-  // the firmware has no humidity threshold to compare it against.
+   
+   
+   
   const saveSettings = async (next) => {
     const merged = { ...settings, ...next };
     setSettings(merged);
@@ -639,13 +639,13 @@ export function useGrowNode() {
         temp_max_c: Number(merged.tempAlertHigh),
         temp_min_c: Number(merged.tempAlertLow),
         min_water_interval_hours: Number(merged.cooldownHours),
-        // Recorded so the choice survives a reload and is visible to anyone
-        // reading the config. The firmware ignores both: it acts on the two
-        // resolved numbers above, exactly as it did before profiles existed.
+         
+         
+         
         plant_mode: merged.plantMode === 'preset' ? 'preset' : 'manual',
         plant_type: String(merged.plantType || 'houseplant'),
-        // The firmware ignores keys it does not know, so these two are
-        // portal-only state that happens to live in the same node.
+         
+         
         subject_epoch: Number(merged.subjectEpoch) || 0,
         subject_label: String(merged.subjectLabel || ''),
         failsafe_timeout_hours: Number(merged.failsafeHours),
@@ -680,14 +680,14 @@ export function useGrowNode() {
     }
   };
 
-  // Declares that the pot now in the rig is a new one. Everything the model
-  // learned about the previous plant stops counting from this moment — not
-  // less, but not at all. See the SUBJECT EPOCH note in dryingModel.js for
-  // why exclusion rather than down-weighting.
-  //
-  // The history itself is untouched: the old readings stay, they simply stop
-  // feeding the fit. That keeps the record whole for the report while
-  // stopping a pot that is no longer here from describing one that is.
+   
+   
+   
+   
+   
+   
+   
+   
   const startNewSubject = async (label = '') => {
     const at = Math.floor(Date.now() / 1000);
     await saveSettings({ subjectEpoch: at, subjectLabel: String(label || '') });
@@ -733,8 +733,8 @@ export function useGrowNode() {
     localStorage.setItem(NOTIF_KEY, JSON.stringify([]));
   };
 
-  // Device notifications live in the database, so clearing them removes them
-  // for everyone rather than only in this browser.
+   
+   
   const clearDeviceNotifs = async () => {
     const confirmed = window.confirm(`Delete all ${deviceNotifications.length} device notifications? This removes them for everyone.`);
     if (!confirmed) return;
@@ -763,9 +763,9 @@ export function useGrowNode() {
     }
   };
 
-  // Check photographs are kept until deleted, so the portal owns their
-  // removal. Routine frames are overwritten on a rotation and are not
-  // deleted here.
+   
+   
+   
   const deleteCheckPhoto = async (id) => {
     try {
       await remove(ref(db, `sensors/camera/check/${id}`));
@@ -776,7 +776,7 @@ export function useGrowNode() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // Everything the controller reported about itself at its last heartbeat.
+   
   const busy = useMemo(() => {
     const what = system.activity ?? 'idle';
     return {

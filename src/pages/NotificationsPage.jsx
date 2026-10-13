@@ -1,24 +1,24 @@
 import { useState } from 'react';
 import { Icon } from '../icons.jsx';
 
-// Two sources, kept apart on purpose.
-//
-// The controller raises its own notifications and stores them in the
-// database, so they survive a closed browser and are the same for everyone.
-// The dashboard raises others locally, sooner, because it sees every reading
-// as it arrives rather than waiting for the controller's rate limit. Showing
-// them in one undifferentiated list would make it impossible to tell what the
-// hardware decided from what this browser noticed.
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
 
 const META = {
-  // raised by the controller
+   
   watered: { icon: 'droplet', tone: 'ok' },
   soil_low: { icon: 'droplet', tone: 'warn' },
   temp_out_of_range: { icon: 'thermo', tone: 'warn' },
   sensor_no_response: { icon: 'alert', tone: 'warn' },
   failsafe_active: { icon: 'shield', tone: 'crit' },
   capture_failed: { icon: 'camera', tone: 'muted' },
-  // raised by the dashboard
+   
   pump: { icon: 'droplet', tone: 'ok' },
   temp: { icon: 'thermo', tone: 'crit' },
   hum: { icon: 'droplet', tone: 'warn' },

@@ -44,7 +44,7 @@ export default function App() {
     window.addEventListener('hashchange', onHash);
     go(pageFromHash());
     return () => window.removeEventListener('hashchange', onHash);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   const Page = {
@@ -62,8 +62,8 @@ export default function App() {
     <div className="app">
       <div className={`scrim ${menuOpen ? 'show' : ''}`} onClick={() => setMenuOpen(false)} />
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
-        {/* The mark belongs here, once. A logo repeated on every page header
-            stops being identification and becomes decoration. */}
+        
+
         <div className="brand">
           <img src={logo} alt="" className="ov-logo" />
           <div>
