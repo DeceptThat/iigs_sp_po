@@ -7,9 +7,9 @@ import { Icon } from '../icons.jsx';
  
 
 const TEAM = [
-  { initials: 'MP', cls: '',  name: 'Myat Phone Pyae',      role: 'Student ID 6530204' },
-  { initials: 'KM', cls: 'b', name: 'Khon Min Wai Than',    role: 'Student ID 6734667' },
+  { initials: 'KM', cls: 'b', name: 'Khon Min Wai Than',      role: 'Project leader \u00b7 Student ID 6734667' },
   { initials: 'NE', cls: 'c', name: 'Nan Ei Shwe Sin Hlaing', role: 'Student ID 6530231' },
+  { initials: 'MP', cls: '',  name: 'Myat Phone Pyae',        role: 'Student ID 6530204' },
 ];
 
  
@@ -42,10 +42,6 @@ const STATUS = [
    'Means, extremes, spread, continuity yield, drying rate and watering intervals over a selectable period.'],
   ['Lighting measurement', 'partial',
    'The module does respond across its full range and the value is published with every reading. It is not calibrated to any photometric unit, and its placement relative to the grow light still has to be set. An earlier note here said the part lacked a photoresistor; that was wrong.'],
-  ['Power resiliency: battery backup and hibernation', 'descoped',
-   'Not built. It needs hardware the project did not have.'],
-  ['Live video feed', 'descoped',
-   'Stills on request instead. A continuous feed needs a standing allocation on the board holding the network connection, and a route in from outside the network.'],
 ];
 
 export default function TeamPage() {
