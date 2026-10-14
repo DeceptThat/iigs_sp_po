@@ -167,8 +167,7 @@ export default function TeamPage() {
         <div className="card-title"><Icon name="chart" size={14} /> Proposal against the prototype</div>
         <p style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 8, marginBottom: 12 }}>
           Implemented means demonstrated on the running system. Partial means
-          built and working with a stated limit. Descoped means not built, with
-          the reason given.
+          built and working with a stated limit.
         </p>
         <div className="table-scroll">
           <table>
