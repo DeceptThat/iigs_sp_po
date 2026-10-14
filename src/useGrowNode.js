@@ -80,6 +80,10 @@ export function useGrowNode() {
   const [soilMoisture, setSoilMoisture] = useState(0);
   const [humidity, setHumidity] = useState(0);
   const [temperature, setTemperature] = useState(0);
+  // The reservoir reaches the portal the same way every other reading does:
+  // the controller publishes it to /sensors/current. Nothing here derived it
+  // before, which is why the Overview tile could only ever show a dash.
+  const [reservoir, setReservoir] = useState({ percent: null, gapMm: null });
   const [runPump, setRunPump] = useState(false);
   const [motorAngle, setMotorAngle] = useState(0);
   const [lightOn, setLightOn] = useState(false);
@@ -164,6 +168,15 @@ export function useGrowNode() {
       if (t !== undefined) setTemperature(t);
       if (h !== undefined) setHumidity(h);
       if (s !== undefined) setSoilMoisture(s);
+      // Taken as published. The controller computes the percentage from its own
+      // calibration, so a bad calibration in the config node cannot blank the
+      // tile - and `reservoir_ok: false` means no echo, which is unknown, not
+      // empty.
+      setReservoir({
+        percent: data.reservoir_ok === false ? null
+               : (typeof data.reservoir_percent === 'number' ? data.reservoir_percent : null),
+        gapMm:   typeof data.reservoir_gap_mm === 'number' ? data.reservoir_gap_mm : null,
+      });
       if (t !== undefined || h !== undefined || s !== undefined) {
         const label = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLive((prevLive) => {
@@ -203,6 +216,7 @@ export function useGrowNode() {
       if (!data) return;
       const n = data.notifications || {};
       const sw = data.sweep || {};
+    const rs = data.reservoir || {};
       setSettings((cur) => ({
         ...cur,
         moistureThreshold: data.moisture_threshold_percent ?? cur.moistureThreshold,
@@ -225,6 +239,8 @@ export function useGrowNode() {
         routineFrames: sw.routine_frames ?? cur.routineFrames,
         checkFrames: sw.check_frames ?? cur.checkFrames,
         checkSweepEnabled: sw.check_sweep_enabled ?? cur.checkSweepEnabled,
+        resGapEmptyMm: rs.gap_empty_mm ?? cur.resGapEmptyMm,
+        resGapFullMm: rs.gap_full_mm ?? cur.resGapFullMm,
         notifyWatered: n.watered ?? true,
         notifySensorFail: n.sensor_no_response ?? true,
         notifySoilLow: n.soil_low ?? true,
@@ -810,8 +826,22 @@ export function useGrowNode() {
     lastImageTarget: camera.lastImageTarget ?? null,
   }), [camera]);
 
+  // Depth in millimetres needs the bin calibration, and the stored one is only
+  // usable if the two ends are far enough apart to divide by. When it is not,
+  // the percentage still shows and the millimetre figure is simply withheld.
+  const resEmptyMm = Number(settings.resGapEmptyMm);
+  const resFullMm = Number(settings.resGapFullMm);
+  const resCalOk = Number.isFinite(resEmptyMm) && Number.isFinite(resFullMm)
+    && resEmptyMm - resFullMm >= 20;
+  const reservoirDepthMm = resCalOk && Number.isFinite(reservoir.gapMm)
+    ? Math.max(0, resEmptyMm - reservoir.gapMm)
+    : null;
+
   return {
     soilMoisture,
+    reservoirPercent: reservoir.percent,
+    reservoirGapMm: reservoir.gapMm,
+    reservoirDepthMm,
     humidity,
     temperature,
     runPump,
