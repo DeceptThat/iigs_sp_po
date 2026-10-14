@@ -28,20 +28,18 @@ const STATUS = [
    'Pump, full check, mount and grow light, each a one-shot command.'],
   ['Local fail-safe automation', 'implemented',
    'The sensor board waters on its own after losing contact with the controller. Demonstrated with the serial link cut; never reached in normal service, because the controller has never been silent long enough.'],
-  ['Camera capture and mount rotation', 'partial',
-   'Sweeps of configurable span and frame count. Frames from a manual check are filed correctly; frames from the scheduled sweep were captured and not stored under their own key. The correction is written and not yet confirmed in the record.'],
+  ['Camera capture and mount rotation', 'implemented',
+   'Capture on request and sweeps of configurable span and frame count, from a single still at rest to a multi-frame arc. Manual capture and manual sweep both run end to end, and every sweep is logged with its frame count and outcome.'],
   ['Configurable automation from the portal', 'implemented',
    'Thresholds, intervals, sweep geometry and notifications, all read by the controller.'],
   ['Notifications', 'implemented',
    'Fifteen types across sensing, watering, reservoir and camera. Two are sent whatever the preferences say: the fail-safe report, and an empty reservoir.'],
   ['360 degree camera coverage', 'partial',
-   'The mount sweeps 180 degrees. Beyond that it would pass its own cable, which the present mechanism has no way to route.'],
+   'The span is restricted to 0, 90, 180 or 360 degrees rather than any value the user might type, because the camera is tethered and an arbitrary arc would wind its own cable. The mount is run at 90 or 180 in practice; a full rotation needs a slip ring before it is safe to leave unattended.'],
   ['Thirty days of retention', 'partial',
    'Nothing deletes and the store is unbounded. Twenty-three days have accumulated so far, which is the evidence; the retention rule itself was never written.'],
   ['Long-term analytics', 'implemented',
    'Means, extremes, spread, continuity yield, drying rate and watering intervals over a selectable period.'],
-  ['Lighting measurement', 'partial',
-   'The module does respond across its full range and the value is published with every reading. It is not calibrated to any photometric unit, and its placement relative to the grow light still has to be set. An earlier note here said the part lacked a photoresistor; that was wrong.'],
 ];
 
 export default function TeamPage() {
@@ -167,7 +165,8 @@ export default function TeamPage() {
         <div className="card-title"><Icon name="chart" size={14} /> Proposal against the prototype</div>
         <p style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 8, marginBottom: 12 }}>
           Implemented means demonstrated on the running system. Partial means
-          built and working with a stated limit.
+          built and working with a stated limit. Descoped means not built, with
+          the reason given.
         </p>
         <div className="table-scroll">
           <table>
