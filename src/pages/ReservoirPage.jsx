@@ -1,37 +1,37 @@
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
+// ===========================================================================
+//  ReservoirPage.jsx — KMN / IIGS portal
+//  Reservoir level display and two-point calibration.
+//
+//  TWO LINES TO CHECK BEFORE THIS COMPILES
+//  ---------------------------------------
+//  1. The import path below ('../firebase') must point at your firebase.js.
+//  2. That file must export the Realtime Database instance as `db`. If it
+//     exports it under another name, change the import. If it exports the
+//     app instead, use:  const db = getDatabase(app);
+//
+//  Everything else is self-contained: no chart library, no CSS framework.
+//  Class names are prefixed rsv- so they cannot collide with your styles.
+//
+//  READS   /sensors/current/{reservoir_gap_mm, reservoir_percent,
+//                            reservoir_ok, timestamp}
+//          /sensors/config/reservoir/{gap_empty_mm, gap_full_mm}
+//          /sensors/history            (last 96 records)
+//  WRITES  /sensors/config/reservoir/{gap_empty_mm, gap_full_mm}
+//          /sensors/control/run_automation_check
+// ===========================================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ref, onValue, update, set, query, limitToLast } from 'firebase/database';
-import { db } from '../firebase';           
+import { db } from '../firebase';          // <-- 1. check this path
 
- 
- 
+// Mirrors the firmware exactly. If you change these in board_a_coordinator.ino,
+// change them here too, or the portal will offer saves the board then rejects.
 const GAP_MIN_MM  = 30;
 const GAP_MAX_MM  = 1000;
 const SPAN_MIN_MM = 20;
-const DEAD_ZONE_MM = 20;       
+const DEAD_ZONE_MM = 20;      // HC-SR04 blind region, for the diagram
 
- 
+// A reading older than this cannot be trusted to describe the bin as it is now.
 const FRESH_WINDOW_S = 120;
 const CHECK_TIMEOUT_S = 90;
 
@@ -41,14 +41,14 @@ export default function ReservoirPage() {
   const [history, setHistory] = useState([]);
   const [now, setNow]         = useState(() => Math.floor(Date.now() / 1000));
   const [toast, setToast]     = useState(null);
-  const [busy, setBusy]       = useState(null);      
+  const [busy, setBusy]       = useState(null);     // 'full' | 'empty' | 'check'
   const [waitingSince, setWaitingSince] = useState(null);
   const [draft, setDraft]     = useState({ full: '', empty: '' });
   const [dims, setDims]       = useState(() => readDims());
 
   const tsAtRequest = useRef(null);
 
-   
+  // ---- live subscriptions ------------------------------------------------
   useEffect(() => {
     const offCurrent = onValue(ref(db, '/sensors/current'), s => setCurrent(s.val()));
     const offCfg = onValue(ref(db, '/sensors/config/reservoir'), s => {
@@ -68,13 +68,13 @@ export default function ReservoirPage() {
     return () => { offCurrent(); offCfg(); offHist(); };
   }, []);
 
-   
+  // One ticking clock drives every age and countdown on the page.
   useEffect(() => {
     const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(id);
   }, []);
 
-   
+  // ---- derived -----------------------------------------------------------
   const gapMm   = numOrNull(current?.reservoir_gap_mm);
   const readingTs = numOrNull(current?.timestamp);
   const ageS    = readingTs == null ? null : Math.max(0, now - readingTs);
@@ -93,13 +93,13 @@ export default function ReservoirPage() {
   const mlPerMm = useMemo(() => {
     const L = Number(dims.l), W = Number(dims.w);
     if (!(L > 0 && W > 0)) return null;
-    return (L * W) / 1000;                  
+    return (L * W) / 1000;                 // mm² × 1 mm = mm³ ; 1000 mm³ = 1 mL
   }, [dims]);
 
   const remainingMl = depthMm != null && mlPerMm != null
     ? Math.round(depthMm * mlPerMm) : null;
 
-   
+  // Did the board answer our Run-check request?
   useEffect(() => {
     if (waitingSince == null) return;
     if (readingTs != null && tsAtRequest.current != null &&
@@ -120,7 +120,7 @@ export default function ReservoirPage() {
     }
   }, [now, readingTs, waitingSince]);
 
-   
+  // ---- actions -----------------------------------------------------------
   async function runCheckNow() {
     setToast(null);
     tsAtRequest.current = readingTs;
@@ -171,7 +171,7 @@ export default function ReservoirPage() {
     try { localStorage.setItem('rsv.dims', JSON.stringify(next)); } catch {}
   }
 
-   
+  // ---- render ------------------------------------------------------------
   const captureBlock = !hasGap
     ? (noEcho ? 'The rangefinder returned no echo. Nothing to capture.'
               : 'No reservoir reading yet. Flash Board A, then run a check.')
@@ -198,7 +198,7 @@ export default function ReservoirPage() {
         </div>
       </header>
 
-      
+      {/* ---------------- live level ---------------- */}
       <section className="rsv-card rsv-level">
         <Tank
           gapMm={gapMm}
@@ -239,6 +239,7 @@ export default function ReservoirPage() {
         </div>
       </section>
 
+      {/* ---------------- calibration ---------------- */}
       <section className="rsv-card">
         <h2>Calibration</h2>
         <p className="rsv-lede">
@@ -315,18 +316,16 @@ export default function ReservoirPage() {
         </div>
 
         <p className="rsv-note">
-          The raw air gap is stored in every history record alongside the percentage,
-          so a calibration corrected later can be applied back across the whole record.
-          A mistake here is recoverable.
+          The raw air gap is stored alongside the percentage, so a calibration
+          corrected later can be reapplied across the record.
         </p>
       </section>
 
+      {/* ---------------- geometry ---------------- */}
       <section className="rsv-card">
         <h2>Bin geometry</h2>
         <p className="rsv-lede">
-          Inside measurements of the reservoir. Used to convert depth to volume, and
-          to work out whether one watering moves the surface far enough for the
-          before/after delivery check to detect it.
+          Inside measurements of the reservoir, used to convert depth to volume.
         </p>
         <div className="rsv-dims">
           <label>
@@ -350,6 +349,7 @@ export default function ReservoirPage() {
         )}
       </section>
 
+      {/* ---------------- trend ---------------- */}
       <section className="rsv-card">
         <h2>Last 48 hours</h2>
         {series.length < 2 ? (
@@ -371,6 +371,10 @@ export default function ReservoirPage() {
     </div>
   );
 }
+
+// ===========================================================================
+//  Sub-components
+// ===========================================================================
 
 function CalEnd({ label, hint, stored, liveGap, disabled, draft, onDraft,
                  onCapture, onSaveTyped, error }) {
@@ -401,9 +405,10 @@ function CalEnd({ label, hint, stored, liveGap, disabled, draft, onDraft,
 }
 
 function Resolution({ mlPerMm, span }) {
+  // The HC-SR04's own repeatability, with the median-of-5 already applied.
   const NOISE_MM = 3;
   const totalMl = Math.round(span * mlPerMm);
-  const minDrop = NOISE_MM + 2;                        
+  const minDrop = NOISE_MM + 2;                       // noise plus a margin
   const detectableMl = Math.round(minDrop * mlPerMm);
   return (
     <>
@@ -430,8 +435,8 @@ function Tank({ gapMm, gapEmpty, gapFull, pct, noEcho }) {
   const innerH = H - PAD * 2;
   const bodyTop = PAD, bodyBot = H - PAD;
 
-   
-   
+  // Map the physical gap range onto the drawing. The top of the tank is the
+  // sensor's full point; above it sits the dead zone band.
   const deadFrac = Math.min(0.22, 20 / Math.max(1, gapEmpty));
   const deadH = innerH * deadFrac;
   const waterTop = bodyTop + deadH;
@@ -444,7 +449,7 @@ function Tank({ gapMm, gapEmpty, gapFull, pct, noEcho }) {
   return (
     <svg className="rsv-tank" viewBox={`0 0 ${W} ${H}`} role="img"
          aria-label={pct == null ? 'Reservoir level unknown' : `Reservoir at ${pct}%`}>
-      
+      {/* dead zone */}
       <rect x={PAD} y={bodyTop} width={W - PAD * 2} height={deadH}
             fill="var(--rsv-dead)" />
       <line x1={PAD} y1={waterTop} x2={W - PAD} y2={waterTop}
@@ -452,7 +457,7 @@ function Tank({ gapMm, gapEmpty, gapFull, pct, noEcho }) {
       <text x={W - PAD - 4} y={bodyTop + deadH / 2 + 3} textAnchor="end"
             className="rsv-tank-tick">dead zone</text>
 
-      
+      {/* water */}
       {pct != null && fillH > 0 && (
         <>
           <rect x={PAD} y={fillY} width={W - PAD * 2} height={fillH}
@@ -467,11 +472,11 @@ function Tank({ gapMm, gapEmpty, gapFull, pct, noEcho }) {
         </text>
       )}
 
-      
+      {/* walls */}
       <path d={`M ${PAD} ${bodyTop} L ${PAD} ${bodyBot} L ${W - PAD} ${bodyBot} L ${W - PAD} ${bodyTop}`}
             fill="none" stroke="var(--rsv-fg)" strokeWidth="2" />
 
-      
+      {/* end labels */}
       <text x={PAD + 4} y={waterTop + 13} className="rsv-tank-tick">
         full · {gapFull} mm gap
       </text>
@@ -515,14 +520,14 @@ function Trend({ series }) {
   );
 }
 
- 
- 
- 
+// ===========================================================================
+//  Helpers
+// ===========================================================================
 function numOrNull(v) { return typeof v === 'number' && Number.isFinite(v) ? v : null; }
 
- 
- 
- 
+// null and '' are absent values, not zero. Number(null) is 0, which is finite,
+// so without this a half-written config node would clamp to the 30 mm floor and
+// look like a deliberate setting.
 function clampInt(v, lo, hi, dflt) {
   if (v === null || v === undefined || v === '') return dflt;
   const n = Math.round(Number(v));
@@ -530,10 +535,10 @@ function clampInt(v, lo, hi, dflt) {
   return Math.max(lo, Math.min(hi, n));
 }
 
- 
- 
- 
- 
+// Math.trunc, NOT Math.round. The firmware computes this with C integer
+// division, which truncates. Rounding here would put the portal one point above
+// the board at some levels — a 65 mm gap stores 83 % and would have displayed
+// 84 %. The number on screen must be the number in the record.
 function pctFromGap(gap, empty, full) {
   const span = empty - full;
   if (span <= 0 || gap <= 0) return null;
@@ -558,9 +563,9 @@ function readDims() {
   return { l: '', w: '' };
 }
 
- 
- 
- 
+// ===========================================================================
+//  Styles — prefixed, theme-aware, no framework
+// ===========================================================================
 const CSS = `
 .rsv{
   --rsv-bg:#f4f6f7; --rsv-surface:#fff; --rsv-fg:#1b2227; --rsv-muted:#67727a;

@@ -107,10 +107,9 @@ export default function SettingsPage({ node }) {
         <div className="kicker">Settings</div>
         <h1>What the controller acts on</h1>
         <p>
-          Every value on this page lives on the controller, not in this browser.
-          The acquisition interval is read once at startup, so a change there
-          takes effect after the next restart; the rest apply on the following
-          cycle.
+          Every value on this page lives on the controller, not in this browser. The
+          acquisition interval takes effect after the next restart; the rest apply
+          on the following cycle.
         </p>
       </div>
 
@@ -127,7 +126,7 @@ export default function SettingsPage({ node }) {
         </div>
       )}
 
-      <div className="grid-2" style={{ alignItems: 'start' }}>
+      <div className="grid-2">
 
         
         <div className="card card-pad">
@@ -397,12 +396,31 @@ export default function SettingsPage({ node }) {
           <div className="aut-note">
             <Icon name="alert" size={17} />
             <span>
-              <b>The failsafe notification cannot be switched off.</b> It reports
-              that the controller became unreachable and the sensor board is
-              running the plant alone, which is the one case where silence looks
-              exactly like normal operation.
+              <b>The failsafe notification cannot be switched off.</b> It reports that the
+              controller became unreachable and the sensor board is running the plant
+              alone.
             </span>
           </div>
+        </div>
+
+        {/* The action bar used to run full width under the grid, which left the
+            second and third columns empty beside Notifications. As a card in the
+            grid it fills that gap and the buttons stay in view with the panel
+            whose values they commit. */}
+        <div className="card card-pad">
+          <div className="card-title"><Icon name="save" size={14} /> Changes</div>
+          <div className="aut-actions" style={{ marginTop: 14 }}>
+            <button className="btn btn-primary" onClick={save} disabled={!dirty}>
+              <Icon name="save" size={16} /> Save to controller
+            </button>
+            <button className="btn btn-ghost" onClick={() => { setDraft(settings); setDirty(false); setNote("Reverted to the values currently on the controller."); }}>
+              <Icon name="undo" size={16} /> Discard changes
+            </button>
+            <button className="btn btn-ghost" onClick={() => { resetSettings(); setDirty(true); setNote('Defaults loaded. Press save to apply them.'); }}>
+              Restore defaults
+            </button>
+          </div>
+          {note && <div className="aut-sub">{note}</div>}
         </div>
       </div>
 
@@ -410,21 +428,6 @@ export default function SettingsPage({ node }) {
           Aiming the camera while unable to see what it is pointing at was the
           wrong arrangement; the controls now sit beside the frame they affect,
           with the tracked angle, Home, Set zero and Stop alongside them. */}
-
-      <div className="card card-pad" style={{ marginTop: 16 }}>
-        <div className="aut-actions">
-          <button className="btn btn-primary" onClick={save} disabled={!dirty}>
-            <Icon name="save" size={16} /> Save to controller
-          </button>
-          <button className="btn btn-ghost" onClick={() => { setDraft(settings); setDirty(false); setNote("Reverted to the values currently on the controller."); }}>
-            <Icon name="undo" size={16} /> Discard changes
-          </button>
-          <button className="btn btn-ghost" onClick={() => { resetSettings(); setDirty(true); setNote('Defaults loaded. Press save to apply them.'); }}>
-            Restore defaults
-          </button>
-        </div>
-        {note && <div className="aut-sub">{note}</div>}
-      </div>
     </section>
   );
 }

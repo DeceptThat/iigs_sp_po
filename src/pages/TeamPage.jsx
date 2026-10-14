@@ -182,7 +182,7 @@ export default function TeamPage() {
                 <tr key={cap}>
                   <td className="td-main">{cap}</td>
                   <td>
-                    <span className={`status-cell s-${status}`}>
+                    <span className={`status-chip s-${status}`}>
                       <span className="s" />
                       {status === 'implemented' ? 'Implemented'
                         : status === 'partial' ? 'Partial' : 'Descoped'}

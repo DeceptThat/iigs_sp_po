@@ -248,9 +248,7 @@ export default function AnalysisPage({ node }) {
         <h1>What the record shows</h1>
         <p>
           Summary statistics over the stored readings, with the continuity of the
-          record reported alongside them. A mean computed over a series with gaps
-          in it is not the same claim as one computed over a complete series, so
-          both are shown together. Nothing here is projected forward.
+          record reported alongside them. Nothing here is projected forward.
         </p>
       </div>
 
@@ -336,10 +334,8 @@ export default function AnalysisPage({ node }) {
               height={170}
             />
             <p className="aut-desc" style={{ marginTop: 10 }}>
-              Computed from the same readings by the Tetens relation, so it carries the
-              climate sensor&rsquo;s error and nothing more. It is plotted on its own
-              scale deliberately: two measures of different magnitude on one frame make
-              the comparison a matter of which axis you chose.
+              Computed from the same readings by the Tetens relation, and plotted on its
+              own scale so the comparison is not a matter of which axis was chosen.
             </p>
           </div>
 
@@ -459,11 +455,10 @@ export default function AnalysisPage({ node }) {
                   <div className="aut-note" style={{ marginTop: 12 }}>
                     <Icon name="shield" size={17} />
                     <span>
-                      <b>Rate and demand cannot be separated here.</b> The measurable
-                      segments differ in starting soil level as much as they differ in
-                      vapour pressure deficit, and with this many points neither can be
-                      held constant while the other varies. The range above is a measured
-                      range of drying rates, not a response to conditions.
+                      <b>Rate and demand cannot be separated here.</b> The segments differ in
+                      starting soil level as much as in vapour pressure deficit, so the
+                      range above is a measured range of drying rates, not a response
+                      to conditions.
                     </span>
                   </div>
                 )}
@@ -471,7 +466,7 @@ export default function AnalysisPage({ node }) {
             )}
           </div>
 
-          <div className="grid-2" style={{ marginTop: 16, alignItems: 'start' }}>
+          <div className="grid-2" style={{ marginTop: 16 }}>
             <div className="card card-pad">
               <div className="card-title"><Icon name="shield" size={14} /> Continuity of the record</div>
               {continuity ? (
@@ -488,12 +483,8 @@ export default function AnalysisPage({ node }) {
                     <div className="mini-stat"><div className="k">longest gap</div><div className="v">{continuity.longestGapMin} min</div></div>
                   </div>
                   <p className="aut-desc" style={{ marginTop: 12 }}>
-                    A record is written only when a cloud transaction succeeds, so an
-                    unbroken series is evidence that the system stayed reachable.
-                    An interruption is counted where the gap exceeds twice the
-                    acquisition interval — and every one of them also ends a drying
-                    segment, which is why the segment count above runs ahead of the
-                    number of waterings.
+                    A record is written only when a cloud transaction succeeds. An interruption
+                    is counted where the gap exceeds twice the acquisition interval.
                   </p>
                 </>
               ) : <div className="stat-sub">not enough readings</div>}
@@ -513,10 +504,8 @@ export default function AnalysisPage({ node }) {
                     </div>
                   )}
                   <p className="aut-desc" style={{ marginTop: 12 }}>
-                    Counted from the automation log, which records what the controller
-                    decided. The soil trace above counts something different — water
-                    arriving at the probe — and the two disagree whenever a pump ran
-                    without delivering, which is exactly the comparison worth making.
+                    Counted from the automation log — what the controller decided — not from
+                    the soil trace.
                   </p>
                 </>
               ) : (
@@ -531,17 +520,8 @@ export default function AnalysisPage({ node }) {
           <div className="card card-pad" style={{ marginTop: 16 }}>
             <div className="card-title"><Icon name="bulb" size={14} /> How a segment is divided</div>
             <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 8 }}>
-              Means, extremes and spread come from the stored readings directly.
-              Watering counts come from the automation log rather than from the soil
-              trace, because the log records what the controller decided while the
-              trace only shows what followed.
-            </p>
-            <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 8 }}>
               Before any segment is cut, readings at either end of the probe&rsquo;s range
-              are discarded — a capacitive probe that has come out of the soil or lost its
-              ground reads at a rail — and what survives is smoothed with a median of five,
-              which discards a single wild reading outright where a mean would let it move
-              the answer, and which leaves a real step edge where it is.
+              are discarded, and what survives is smoothed with a median of five.
             </p>
             <div className="table-scroll" style={{ marginTop: 10 }}>
               <table>
@@ -573,10 +553,8 @@ export default function AnalysisPage({ node }) {
               </table>
             </div>
             <p style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 10 }}>
-              Not one of those numbers is tuned. Ten points comes from the fastest drying
-              rate the record contains; six hours is a setting the controller already acts
-              on. The order matters too — testing for a gap before testing the size of the
-              jump files a watering that happened across a gap as a gap, and loses it.
+              None of those numbers is tuned: ten points comes from the fastest drying rate
+              in the record, six hours from a setting the controller already acts on.
             </p>
           </div>
         </>

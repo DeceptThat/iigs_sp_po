@@ -3,8 +3,37 @@ import { Icon } from '../icons.jsx';
 import BusyBanner from '../BusyBanner.jsx';
 import { vpd } from '../dryingModel.js';
 
+// NO FORECAST ON THIS PAGE.
+//
+// This slot held a predicted time to the next watering, fitted from the
+// observed drying cycles. It has been removed, along with the fit it rested
+// on, and the reason is in the data rather than in the code: across the four
+// drying segments long enough to measure, the rate spans 0.18 to 1.05 %/h,
+// and the starting soil level and the vapour pressure deficit rise together
+// through all four. Neither can be separated from the other, so the rate
+// cannot be projected forward from conditions - only measured after the fact.
+//
+// What replaces it is that measurement. Every number on this page is now
+// something the system observed.
+
+// The most recent wetting event, and the drying since it.
+//
+// Same rule the segment analysis uses, and it was validated against the
+// automation log: of the three wetting events it finds in the 23-day record,
+// two sit on logged pump activity and the third was a watering done by hand
+// that the system never knew about.
+//
+//   1. discard readings at either end of the probe's range - a capacitive
+//      probe that has lost its ground reads at a rail, not at a value
+//   2. median of five, which throws out a single wild reading outright and
+//      leaves a genuine step edge exactly where it is
+//   3. a gap longer than the watering cooldown ends the segment: across a
+//      longer hole more than one watering could have happened
+//   4. a rise of ten points is water added - the fastest drying measured
+//      anywhere is about 1 %/h, so half an hour moves the soil half a point
+//   5. a fall of ten points is the instrument, not the soil
 const WETTING_RISE_PCT = 10;
-const ATTRIBUTABLE_GAP_S = 6 * 3600;
+const ATTRIBUTABLE_GAP_S = 6 * 3600;   // the configured watering cooldown
 
 function dryingSinceWetting(readings) {
   const pts = readings
@@ -18,6 +47,7 @@ function dryingSinceWetting(readings) {
     return { t: p.timestamp, m: w[Math.floor(w.length / 2)] };
   });
 
+  // The last boundary of any kind opens the current segment.
   let start = 0;
   for (let i = 1; i < med.length; i++) {
     const gap = med[i].t - med[i - 1].t;
@@ -40,7 +70,7 @@ function dryingSinceWetting(readings) {
     from: seg[0].m,
     to: seg[seg.length - 1].m,
     since: seg[0].t,
-    wetted: start > 0,
+    wetted: start > 0,          // false when the record simply starts here
   };
 }
 
@@ -50,6 +80,7 @@ function fmtSpan(h) {
   return `${(h / 24).toFixed(1)} days`;
 }
 
+// Soil over the trailing window, drawn from the readings already in memory.
 function Sparkline({ readings, accent }) {
   const pts = useMemo(() => {
     if (!readings.length) return null;
@@ -71,11 +102,11 @@ function Sparkline({ readings, accent }) {
     return <div className="ov-spark-empty">No readings in this window yet.</div>;
   }
   return (
-    <svg viewBox="0 0 980 112" className="ov-spark" role="img"
+    <svg viewBox="0 0 980 112" preserveAspectRatio="none" className="ov-spark" role="img"
          aria-label="Soil moisture trend over the last 24 hours">
       <line x1="0" y1="96" x2="980" y2="96" />
       <line x1="0" y1="16" x2="980" y2="16" />
-      <polyline points={pts} fill="none" stroke={accent} strokeWidth="2.5" strokeLinejoin="round" />
+      <polyline points={pts} fill="none" stroke={accent} strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
@@ -103,15 +134,20 @@ export default function OverviewPage({ node, go }) {
   const soilPct = Number.isFinite(soilMoisture) ? Math.max(0, Math.min(100, soilMoisture)) : 0;
   const belowThreshold = Number.isFinite(soilMoisture) && soilMoisture <= threshold;
 
+  // Published by the controller once the reservoir is calibrated. Absent until
+  // then, and shown as absent rather than as zero.
   const reservoirPct = Number.isFinite(node.reservoirPercent) ? node.reservoirPercent : null;
   const reservoirMm = Number.isFinite(node.reservoirDepthMm) ? node.reservoirDepthMm : null;
 
+  // Board B has no heartbeat of its own; the survey log is the only place its
+  // silence shows up, so that is what is reported rather than a guess.
   const motorSuspect = (controllerHealth.lastSurveyError || '').includes('motor');
 
   return (
     <section className="page ov">
       <BusyBanner busy={node.busy ?? { active: false }} />
 
+      {/* Warnings sit at the TOP and only exist when something is wrong. */}
       {!isBoardOnline && (
         <div className="ov-alert">
           <span className="ov-dot" aria-hidden="true" />
@@ -124,10 +160,7 @@ export default function OverviewPage({ node, go }) {
           <div className="kicker">OVERVIEW</div>
           <h1>Plant status</h1>
           <p>
-            Live readings from the IIGS controller, newest first. Watering is
-            decided and carried out on the board itself — this page is a window
-            onto it, not the mechanism, and the plant is watered on schedule
-            whether or not anyone has it open.
+            Live readings from the IIGS controller, newest first.
           </p>
         </div>
         <div className="ov-sync">
@@ -136,6 +169,7 @@ export default function OverviewPage({ node, go }) {
         </div>
       </header>
 
+      {/* HERO — soil is the quantity the system exists to control. */}
       <section className="card card-pad ov-hero">
         <div className="ov-hero-main">
           <div className="kicker">SOIL MOISTURE</div>
@@ -157,6 +191,8 @@ export default function OverviewPage({ node, go }) {
         </div>
 
         <div className="ov-hero-side">
+          {/* Measured, not projected: how far the soil has fallen since water
+              last reached it, and how fast. */}
           <div className="ov-mini">
             <div className="kicker">DRIED SINCE WATERING</div>
             {drying ? (
@@ -188,6 +224,7 @@ export default function OverviewPage({ node, go }) {
         </div>
       </section>
 
+      {/* Supporting measurements — inputs to the number above. */}
       <section className="ov-stats">
         <div className="card card-pad ov-stat">
           <div className="kicker">TEMPERATURE</div>
@@ -232,6 +269,7 @@ export default function OverviewPage({ node, go }) {
         <Sparkline readings={last24} accent="var(--accent)" />
       </section>
 
+      {/* Manual control: one click away, but not the headline. */}
       <section className="card card-pad ov-manual">
         <span className="kicker">MANUAL</span>
         <button className="btn btn-danger" onClick={togglePump} disabled={runPump}>
@@ -249,6 +287,7 @@ export default function OverviewPage({ node, go }) {
         </button>
       </section>
 
+      {/* Board health — the question that is expensive to answer any other way. */}
       <section className="card card-pad ov-boards">
         <span className="kicker">BOARDS</span>
         <span className={`ov-board ${isBoardOnline ? 'ok' : 'bad'}`}>

@@ -350,7 +350,7 @@ export default function CameraPage() {
               }} />
           </Field>
           <Field label="Span" hint="degrees swept">
-            <select defaultValue={manSpan} key={'ms' + manSpan}
+            <select ref={spanRef} defaultValue={manSpan} key={'ms' + manSpan}
               onChange={e => saveCfg('/sensors/config/sweep', { manual_span_deg: +e.target.value }, 'Sweep span')}>
               {SPANS.map(s => <option key={s} value={s}>{s === 0 ? '0° — no movement' : s + '°'}</option>)}
             </select>
@@ -362,10 +362,6 @@ export default function CameraPage() {
             </button>
           </div>
         </div>
-        <p className="cam-note">
-          The sweep is for a bench of plants, not this one. It stays manual so a mechanical
-          failure costs a retry rather than a hole in the record.
-        </p>
       </section>
 
       {/* ------------- archive ------------- */}

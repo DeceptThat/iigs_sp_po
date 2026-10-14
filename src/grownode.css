@@ -277,7 +277,7 @@ tbody td { padding: 10px 12px; border-bottom: 1px dashed var(--line); font-famil
 .badge.ok { background: var(--ok-bg); color: var(--ok); }
 .badge.warn { background: var(--warn-bg); color: var(--warn); }
 .badge.crit { background: var(--crit-bg); color: var(--crit); }
-.mini-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.mini-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 12px; }
 .mini-stat { padding: 14px 16px; }
 .mini-stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-family: var(--font-mono); margin-bottom: 8px; }
 .mini-stat .v { font-family: var(--font-mono); font-size: 13.5px; display: flex; gap: 12px; flex-wrap: wrap; }
@@ -312,8 +312,8 @@ tbody td { padding: 10px 12px; border-bottom: 1px dashed var(--line); font-famil
 .stack-list li, .vp-list li { display: flex; gap: 9px; font-size: 13.5px; padding: 7px 0; border-bottom: 1px dashed var(--line); color: var(--ink-soft); }
 .stack-list li:last-child, .vp-list li:last-child { border-bottom: 0; }
 .stack-list li::before { content: ''; width: 6px; height: 6px; border-radius: 2px; background: var(--accent); flex: none; margin-top: 7px; }
-.status-cell { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
-.status-cell .s { width: 8px; height: 8px; border-radius: 50%; }
+.status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
+.status-chip .s { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .s-implemented { color: var(--ok); } .s-implemented .s { background: var(--ok); }
 .s-partial { color: var(--warn); } .s-partial .s { background: var(--warn); }
 .s-descoped { color: var(--muted); } .s-descoped .s { background: var(--muted); }
@@ -532,3 +532,37 @@ select.sel:disabled { opacity: 0.5; cursor: not-allowed; }
   .ov-stats { grid-template-columns: 1fr; }
   .ov-hero-side { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------------------
+   Shrink guards.
+
+   A grid or flex item defaults to min-width:auto, which means it refuses to
+   become narrower than its content. One long unbreakable string - a mono
+   timestamp, a reading with its unit, a file name - then widens its track and
+   pushes the row past the card's border. These rules let the items shrink,
+   which is what every one of these containers already assumes.
+   --------------------------------------------------------------------------- */
+.grid-stats > *, .grid-2 > *, .grid-3 > *, .mini-stats > *, .quick-grid > *,
+.gallery > *, .team-grid > *, .settings-grid > *, .overview-panels > *,
+.ov-stats > *, .ov-hero-side > *, .status-cell > *, .chart-legend > * {
+  min-width: 0;
+}
+
+/* The legend pushes its right-hand figure out with margin-left:auto; without
+   this it is the item that overflows when the card is narrow. */
+.chart-legend { row-gap: 6px; }
+.legend-current { min-width: 0; overflow-wrap: anywhere; }
+
+/* Three mini-stats in a half-width card wrapped 2 + 1 and left a hole where
+   the third should have been; 118px lets all three sit on one row and the
+   two-item groups are unaffected. */
+
+/* Equal-height tiles. Grid stretches by default, but a card whose own box is
+   sized by its content can still come up short - the same height:100% the
+   settings grid already uses. */
+.ov-stats > .card,
+.grid-2 > .card,
+.grid-3 > .card { height: 100%; }
+
+/* The chart area should reach both edges of its card. */
+.ov-spark { display: block; width: 100%; }

@@ -152,10 +152,8 @@ export default function NotificationsPage({ node }) {
         <div className="kicker">Notifications</div>
         <h1>Alert log</h1>
         <p>
-          The controller raises its own alerts and stores them in the database,
-          so they survive a closed browser. This dashboard raises others
-          locally, and sooner, because it sees every reading as it arrives.
-          They are listed separately so it is clear which is which.
+          Alerts from the controller are stored in the database and survive a closed
+          browser. The dashboard raises its own locally, listed separately.
         </p>
       </div>
 
