@@ -17,7 +17,7 @@ const TEAM = [
  
 const STATUS = [
   ['Monitor temperature, humidity and soil moisture', 'implemented',
-   'DHT22 and a calibrated capacitive probe, read on every cycle.'],
+   'DHT11 and a calibrated capacitive probe, read on every cycle. The DHT22 the proposal specified failed in service and was replaced with the only spare available.'],
   ['Record readings to the cloud', 'implemented',
    'Written only on a successful transaction, so the series is itself a record of uptime.'],
   ['Automatic watering by threshold', 'implemented',
@@ -27,21 +27,21 @@ const STATUS = [
   ['Manual override from the portal', 'implemented',
    'Pump, full check, mount and grow light, each a one-shot command.'],
   ['Local fail-safe automation', 'implemented',
-   'The sensor board waters on its own after losing contact with the controller. Fired in testing.'],
-  ['Camera capture and mount rotation', 'implemented',
-   'Sweeps of configurable span and frame count, filed to two separate stores.'],
+   'The sensor board waters on its own after losing contact with the controller. Demonstrated with the serial link cut; never reached in normal service, because the controller has never been silent long enough.'],
+  ['Camera capture and mount rotation', 'partial',
+   'Sweeps of configurable span and frame count. Frames from a manual check are filed correctly; frames from the scheduled sweep were captured and not stored under their own key. The correction is written and not yet confirmed in the record.'],
   ['Configurable automation from the portal', 'implemented',
    'Thresholds, intervals, sweep geometry and notifications, all read by the controller.'],
   ['Notifications', 'implemented',
-   'Six types, five of them switchable. The fail-safe alert cannot be switched off.'],
+   'Fifteen types across sensing, watering, reservoir and camera. Two are sent whatever the preferences say: the fail-safe report, and an empty reservoir.'],
   ['360 degree camera coverage', 'partial',
    'The mount sweeps 180 degrees. Beyond that it would pass its own cable, which the present mechanism has no way to route.'],
   ['Thirty days of retention', 'partial',
-   'Nothing deletes and the store is unbounded, so the capacity exists. What is missing is elapsed time.'],
+   'Nothing deletes and the store is unbounded. Twenty-three days have accumulated so far, which is the evidence; the retention rule itself was never written.'],
   ['Long-term analytics', 'implemented',
    'Means, extremes, spread, continuity yield, drying rate and watering intervals over a selectable period.'],
-  ['Lighting measurement', 'descoped',
-   'The module bought for it carried no photoresistor. The relay that switches a grow light does work.'],
+  ['Lighting measurement', 'partial',
+   'The module does respond across its full range and the value is published with every reading. It is not calibrated to any photometric unit, and its placement relative to the grow light still has to be set. An earlier note here said the part lacked a photoresistor; that was wrong.'],
   ['Power resiliency: battery backup and hibernation', 'descoped',
    'Not built. It needs hardware the project did not have.'],
   ['Live video feed', 'descoped',
@@ -124,8 +124,10 @@ export default function TeamPage() {
           <ul className="stack-list" style={{ marginTop: 8 }}>
             <li>3 × ESP32 development boards</li>
             <li>Seeed XIAO ESP32-S3 Sense (camera)</li>
-            <li>DHT22 temperature and humidity</li>
+            <li>DHT11 temperature and humidity</li>
             <li>Capacitive soil moisture probe</li>
+            <li>HC-SR04 rangefinder (reservoir level)</li>
+            <li>LM393 comparator module (light)</li>
             <li>Submersible pump on a relay</li>
             <li>Grow light on a second relay</li>
             <li>28BYJ-48 stepper with ULN2003</li>
@@ -202,10 +204,11 @@ export default function TeamPage() {
         <ul className="vp-list" style={{ marginTop: 8 }}>
           <li>
             <b style={{ color: 'var(--ink)' }}>The handshake fault is bounded, not fixed.</b>{' '}
-            Memory exhaustion, heap fragmentation and interference from the
-            pump were each ruled out by measurement. The cause remains
-            unestablished; a back-off and a scheduled restart keep the system
-            running through it.
+            Memory is excluded by measurement rather than by argument: free
+            memory <i>rises</i> by 14 to 22 KB at the moment of failure, which is
+            the secure session being torn down and its buffer returned, and the
+            largest free block never moves. The cause remains unestablished; a
+            back-off and a scheduled restart keep the system running through it.
           </li>
           <li>
             <b style={{ color: 'var(--ink)' }}>Mount position is counted, not measured.</b>{' '}

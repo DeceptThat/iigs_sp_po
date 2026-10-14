@@ -499,20 +499,22 @@ function fmtWhen(ts) {
 
 // ===========================================================================
 const CSS = `
+/* This page used to carry its own palette and its own dark-mode media query,
+   so it followed the operating system while every other page followed the
+   portal. That is why it was the only page that did not change colour. The
+   --cam-* names are kept because the rules below use them everywhere; they
+   now simply point at the portal's tokens, so this page follows the theme
+   automatically, light or dark. */
 .cam{
-  --cam-bg:#f4f6f7; --cam-surface:#fff; --cam-sunk:#eef2f3; --cam-fg:#1b2227;
-  --cam-muted:#67727a; --cam-rule:#d4dcdf; --cam-accent:#1f5673;
-  --cam-ok:#215f3f; --cam-ok-bg:#e0f0e7; --cam-warn:#8a5a00; --cam-warn-bg:#f7eedb;
-  --cam-err:#9c3a2a; --cam-err-bg:#f9e5e0; --cam-stop:#9c3a2a;
+  --cam-bg:var(--bg); --cam-surface:var(--card); --cam-sunk:var(--panel-2);
+  --cam-fg:var(--ink); --cam-muted:var(--muted); --cam-rule:var(--card-border);
+  --cam-accent:var(--accent);
+  --cam-ok:var(--ok); --cam-ok-bg:var(--ok-bg);
+  --cam-warn:var(--warn); --cam-warn-bg:var(--warn-bg);
+  --cam-err:var(--crit); --cam-err-bg:var(--crit-bg); --cam-stop:var(--crit);
   color:var(--cam-fg); font-size:15px; line-height:1.55;
   max-width:900px; margin:0 auto; padding-inline:16px; padding-block:24px 56px;
 }
-@media (prefers-color-scheme:dark){ .cam{
-  --cam-bg:#14181b; --cam-surface:#1c2227; --cam-sunk:#161b1f; --cam-fg:#e4e4e1;
-  --cam-muted:#95a0a7; --cam-rule:#2d353b; --cam-accent:#74b4cf;
-  --cam-ok:#6cbf8a; --cam-ok-bg:#18291f; --cam-warn:#dcab52; --cam-warn-bg:#2c2518;
-  --cam-err:#e38672; --cam-err-bg:#32201c; --cam-stop:#e38672;
-}}
 .cam *{box-sizing:border-box}
 .cam-head{display:flex;justify-content:space-between;align-items:flex-start;
   gap:12px;flex-wrap:wrap;margin-bottom:18px}

@@ -567,22 +567,25 @@ function readDims() {
 //  Styles — prefixed, theme-aware, no framework
 // ===========================================================================
 const CSS = `
+/* Like the camera page, this one carried its own palette and its own
+   dark-mode media query, so it followed the operating system and used a blue
+   accent while the rest of the portal is green. The --rsv-* names stay, since
+   the rules below use them throughout; they now point at the portal tokens.
+
+   The water fill is the exception and stays blue on purpose: it is a literal
+   depiction of water in a bin, and it reuses the same blue the rest of the
+   portal already uses for humidity, so "blue means water" holds everywhere. */
 .rsv{
-  --rsv-bg:#f4f6f7; --rsv-surface:#fff; --rsv-fg:#1b2227; --rsv-muted:#67727a;
-  --rsv-rule:#d4dcdf; --rsv-accent:#1f5673; --rsv-water:#4a9ec4;
-  --rsv-water-edge:#1f6f96; --rsv-dead:#e4e9eb;
-  --rsv-warn:#8a5a00; --rsv-warn-bg:#f7eedb; --rsv-err:#9c3a2a; --rsv-err-bg:#f9e5e0;
-  --rsv-ok:#215f3f; --rsv-ok-bg:#e0f0e7;
+  --rsv-bg:var(--bg); --rsv-surface:var(--card); --rsv-fg:var(--ink);
+  --rsv-muted:var(--muted); --rsv-rule:var(--card-border);
+  --rsv-accent:var(--accent);
+  --rsv-water:var(--hum); --rsv-water-edge:#1d4f91; --rsv-dead:var(--panel-2);
+  --rsv-warn:var(--warn); --rsv-warn-bg:var(--warn-bg);
+  --rsv-err:var(--crit); --rsv-err-bg:var(--crit-bg);
+  --rsv-ok:var(--ok); --rsv-ok-bg:var(--ok-bg);
   color:var(--rsv-fg); font-size:15px; line-height:1.55;
   max-width:860px; margin:0 auto; padding-inline:16px; padding-block:24px 56px;
 }
-@media (prefers-color-scheme:dark){ .rsv{
-  --rsv-bg:#14181b; --rsv-surface:#1c2227; --rsv-fg:#e4e4e1; --rsv-muted:#95a0a7;
-  --rsv-rule:#2d353b; --rsv-accent:#74b4cf; --rsv-water:#2d6a8c;
-  --rsv-water-edge:#8ccbe6; --rsv-dead:#232a2f;
-  --rsv-warn:#dcab52; --rsv-warn-bg:#2c2518; --rsv-err:#e38672; --rsv-err-bg:#32201c;
-  --rsv-ok:#6cbf8a; --rsv-ok-bg:#18291f;
-}}
 .rsv *{box-sizing:border-box}
 .rsv-head{display:flex;justify-content:space-between;align-items:flex-start;
   gap:12px;flex-wrap:wrap;margin-bottom:20px}
