@@ -1,13 +1,3 @@
-/* ---------------------------------------------------------------------------
-   LIGHT THEME - white surfaces, green identity, amber as the second accent.
-
-   To go back to the dark theme, swap this :root block for the one commented
-   out directly below it. Nothing else in the file is theme-specific except the
-   handful of fixed colours noted at their own rules.
-
-   Every colour that carries text was checked against its background:
-   body text 15.5:1, secondary 7.8:1, muted 5.3:1, accent 4.6:1, amber 5.9:1.
-   --------------------------------------------------------------------------- */
 :root {
   color-scheme: light;
   --bg: #f6f8f3;
@@ -21,9 +11,6 @@
   --ink-soft: #44514a;
   --muted: #5d6a62;
   --line: #e3e8dd;
-
-  /* The rail stays dark green: it is the brand mark, and it separates
-     navigation from content without needing a heavy border. */
   --sidebar: #17442a;
   --sidebar-2: #103520;
   --sidebar-line: #255a39;
@@ -55,51 +42,6 @@
   --r-sm: 8px;
   --r-md: 10px;
 }
-
-/* PREVIOUS DARK THEME - restore by swapping it with the block above.
-:root {
-  color-scheme: dark;
-  --bg: #17181b;
-  --bg-glow: #1b1d21;
-  --card: #1f2125;
-  --card-border: #2e3036;
-  --card-border-strong: #3a3d44;
-  --panel: #1f2125;
-  --panel-2: #24262b;
-  --ink: #e8e8e6;
-  --ink-soft: #b4b7bc;
-  --muted: #8b8f96;
-  --line: #2c2e33;
-  --sidebar: #1b1c1f;
-  --sidebar-2: #1b1c1f;
-  --sidebar-line: #2a2c31;
-  --sidebar-ink: #e3e4e6;
-  --sidebar-muted: #8b8f96;
-  --sidebar-active: #26282d;
-  --accent: #60be74;
-  --accent-bright: #7fd092;
-  --accent-ink: #3caa53;
-  --ok: #60be74;
-  --ok-bg: #1b2e21;
-  --warn: #e0a93c;
-  --warn-bg: #33281a;
-  --crit: #d9634a;
-  --crit-bg: #3a221d;
-  --temp: #d98a5c;
-  --hum: #6f9fd8;
-  --soil: #60be74;
-  --chart-grid: #2c2e33;
-  --chart-tick: #8b8f96;
-  --font-head: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
-  --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-float: 0 12px 34px -12px rgba(0, 0, 0, 0.6);
-  --radius: 14px;
-  --r-sm: 8px;
-  --r-md: 10px;
-}
-*/
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -557,8 +499,6 @@ select.sel:disabled { opacity: 0.5; cursor: not-allowed; }
 .ov-stat-val small { font-size: 16px; color: var(--muted); }
 .ov-stat-val.muted { color: var(--muted); }
 .ov-stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
-/* Only the uncalibrated state is a warning; a working reading in alarm
-   orange reads as a fault that is not there. */
 .ov-stat-sub--warn { color: var(--warn); }
 .ov-stat-empty { border-style: dashed; }
 .ov-row-head { display: flex; align-items: center; justify-content: space-between; }
@@ -595,37 +535,14 @@ select.sel:disabled { opacity: 0.5; cursor: not-allowed; }
   .ov-stats { grid-template-columns: 1fr; }
   .ov-hero-side { grid-template-columns: 1fr; }
 }
-
-/* ---------------------------------------------------------------------------
-   Shrink guards.
-
-   A grid or flex item defaults to min-width:auto, which means it refuses to
-   become narrower than its content. One long unbreakable string - a mono
-   timestamp, a reading with its unit, a file name - then widens its track and
-   pushes the row past the card's border. These rules let the items shrink,
-   which is what every one of these containers already assumes.
-   --------------------------------------------------------------------------- */
 .grid-stats > *, .grid-2 > *, .grid-3 > *, .mini-stats > *, .quick-grid > *,
 .gallery > *, .team-grid > *, .settings-grid > *, .overview-panels > *,
 .ov-stats > *, .ov-hero-side > *, .status-cell > *, .chart-legend > * {
   min-width: 0;
 }
-
-/* The legend pushes its right-hand figure out with margin-left:auto; without
-   this it is the item that overflows when the card is narrow. */
 .chart-legend { row-gap: 6px; }
 .legend-current { min-width: 0; overflow-wrap: anywhere; }
-
-/* Three mini-stats in a half-width card wrapped 2 + 1 and left a hole where
-   the third should have been; 118px lets all three sit on one row and the
-   two-item groups are unaffected. */
-
-/* Equal-height tiles. Grid stretches by default, but a card whose own box is
-   sized by its content can still come up short - the same height:100% the
-   settings grid already uses. */
 .ov-stats > .card,
 .grid-2 > .card,
 .grid-3 > .card { height: 100%; }
-
-/* The chart area should reach both edges of its card. */
 .ov-spark { display: block; width: 100%; }

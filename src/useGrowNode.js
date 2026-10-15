@@ -80,9 +80,9 @@ export function useGrowNode() {
   const [soilMoisture, setSoilMoisture] = useState(0);
   const [humidity, setHumidity] = useState(0);
   const [temperature, setTemperature] = useState(0);
-  // The reservoir reaches the portal the same way every other reading does:
-  // the controller publishes it to /sensors/current. Nothing here derived it
-  // before, which is why the Overview tile could only ever show a dash.
+                                                                            
+                                                                             
+                                                                        
   const [reservoir, setReservoir] = useState({ percent: null, gapMm: null });
   const [runPump, setRunPump] = useState(false);
   const [motorAngle, setMotorAngle] = useState(0);
@@ -168,10 +168,10 @@ export function useGrowNode() {
       if (t !== undefined) setTemperature(t);
       if (h !== undefined) setHumidity(h);
       if (s !== undefined) setSoilMoisture(s);
-      // Taken as published. The controller computes the percentage from its own
-      // calibration, so a bad calibration in the config node cannot blank the
-      // tile - and `reservoir_ok: false` means no echo, which is unknown, not
-      // empty.
+                                                                                
+                                                                              
+                                                                              
+               
       setReservoir({
         percent: data.reservoir_ok === false ? null
                : (typeof data.reservoir_percent === 'number' ? data.reservoir_percent : null),
@@ -826,9 +826,9 @@ export function useGrowNode() {
     lastImageTarget: camera.lastImageTarget ?? null,
   }), [camera]);
 
-  // Depth in millimetres needs the bin calibration, and the stored one is only
-  // usable if the two ends are far enough apart to divide by. When it is not,
-  // the percentage still shows and the millimetre figure is simply withheld.
+                                                                               
+                                                                              
+                                                                             
   const resEmptyMm = Number(settings.resGapEmptyMm);
   const resFullMm = Number(settings.resGapFullMm);
   const resCalOk = Number.isFinite(resEmptyMm) && Number.isFinite(resFullMm)

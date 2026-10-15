@@ -403,10 +403,10 @@ export default function SettingsPage({ node }) {
           </div>
         </div>
 
-        {/* The action bar used to run full width under the grid, which left the
-            second and third columns empty beside Notifications. As a card in the
-            grid it fills that gap and the buttons stay in view with the panel
-            whose values they commit. */}
+                                                                                
+                                                                                 
+                                                                              
+                                         
         <div className="card card-pad">
           <div className="card-title"><Icon name="save" size={14} /> Changes</div>
           <div className="aut-actions" style={{ marginTop: 14 }}>
@@ -424,10 +424,10 @@ export default function SettingsPage({ node }) {
         </div>
       </div>
 
-      {/* THE MOUNT PANEL HAS MOVED TO THE CAMERA PAGE.
-          Aiming the camera while unable to see what it is pointing at was the
-          wrong arrangement; the controls now sit beside the frame they affect,
-          with the tracked angle, Home, Set zero and Stop alongside them. */}
+                                                       
+                                                                              
+                                                                               
+                                                                             
     </section>
   );
 }

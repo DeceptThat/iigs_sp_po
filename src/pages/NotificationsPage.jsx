@@ -1,19 +1,19 @@
 import { useMemo, useState } from 'react';
 import { Icon } from '../icons.jsx';
 
-// WHAT EACH ALERT LOOKS LIKE, AND WHAT CANCELS IT.
-//
-// Nine of the controller's types were missing from this table and fell through
-// to the generic bell, so a board that had given up after three hard resets
-// looked the same as a photograph that did not confirm. Every type the
-// firmware can raise is listed here now.
-//
-// `clears` names the family a resolution belongs to. The controller sends a
-// recovery notice when a condition ends - soil back above the threshold, the
-// reservoir refilled, the sensor board answering again - and a warning paired
-// with its recovery is one finished event, not two unrelated lines.
+                                                   
+  
+                                                                               
+                                                                            
+                                                                       
+                                         
+  
+                                                                            
+                                                                             
+                                                                              
+                                                                    
 const META = {
-  // ---- from the controller ----
+                                  
   watered:              { icon: 'droplet', tone: 'ok',    unit: '%'  },
   soil_low:             { icon: 'droplet', tone: 'warn',  unit: '%',  family: 'soil' },
   soil_recovered:       { icon: 'check',   tone: 'ok',    unit: '%',  clears: 'soil' },
@@ -30,7 +30,7 @@ const META = {
   failsafe_active:      { icon: 'shield',  tone: 'crit',  unit: '%'  },
   capture_failed:       { icon: 'camera',  tone: 'muted'              },
 
-  // ---- raised by this dashboard ----
+                                       
   pump: { icon: 'droplet', tone: 'ok' },
   temp: { icon: 'thermo',  tone: 'crit' },
   hum:  { icon: 'droplet', tone: 'warn' },
@@ -68,32 +68,32 @@ export default function NotificationsPage({ node }) {
   const [filter, setFilter] = useState('all');
   const raw = source === 'device' ? deviceNotifications : notifications;
 
-  // Pair each recovery with the warning it ends.
-  //
-  // Only attempted when the entries carry a sortable timestamp. Without one the
-  // order of the list is the only evidence of sequence, and guessing at it
-  // would pair the wrong events - better to show every line plainly than to
-  // claim a relationship that might be backwards.
+                                                 
+    
+                                                                                
+                                                                           
+                                                                            
+                                                  
   const { list, pairable, counts } = useMemo(() => {
     const dated = raw.length > 0 && raw.every((n) => Number.isFinite(n.timestamp));
     const items = raw.map((n) => ({ ...n, meta: META[n.type] || META.info }));
 
     if (dated) {
-      const byTime = [...items].sort((a, b) => b.timestamp - a.timestamp); // newest first
-      const openByFamily = new Map();   // family -> every warning still open in it
-      // Walk oldest to newest so a resolution can only close a warning that
-      // already existed when it arrived.
+      const byTime = [...items].sort((a, b) => b.timestamp - a.timestamp);                
+      const openByFamily = new Map();                                              
+                                                                            
+                                         
       for (let i = byTime.length - 1; i >= 0; i--) {
         const n = byTime[i];
         const { family, clears } = n.meta;
         if (family) {
-          // A SECOND WARNING IN THE SAME FAMILY IS THE SAME EPISODE, ESCALATED.
-          //
-          // The reservoir falling from low to empty raises two warnings about
-          // one tank. Holding only the latest orphaned the first, which then
-          // sat marked open for the rest of the log because the refill that
-          // ended it had already closed its successor. The whole chain is kept
-          // and the whole chain closes together.
+                                                                                
+            
+                                                                              
+                                                                             
+                                                                            
+                                                                               
+                                                 
           const openList = openByFamily.get(family) || [];
           for (const prev of openList) prev.supersededBy = n;
           if (openList.length) n.supersedes = openList[openList.length - 1];
@@ -131,10 +131,10 @@ export default function NotificationsPage({ node }) {
     let v = list;
     if (filter === 'open') v = v.filter((n) => n.meta.family && !n.resolvedBy && !n.supersededBy);
     if (filter === 'crit') v = v.filter((n) => n.severity === 'critical' || n.meta.tone === 'crit');
-    // A resolution folds into the warning it closed, so it is not also a row
-    // of its own. One finished event reads as one line.
-    // A resolution folds into the warning it closed, and a warning that was
-    // escalated folds into the one that replaced it. One episode, one row.
+                                                                             
+                                                        
+                                                                            
+                                                                           
     if (pairable) v = v.filter((n) => !n.resolves && !n.supersededBy);
     return v;
   }, [list, filter, pairable]);

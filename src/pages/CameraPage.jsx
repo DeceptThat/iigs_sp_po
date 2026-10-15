@@ -1,51 +1,51 @@
-// ===========================================================================
-//  CameraPage.jsx — KMN / IIGS portal
-//  Mount control, photographic settings, capture and the frame archive.
-//
-//  TWO LINES TO CHECK BEFORE THIS COMPILES
-//  ---------------------------------------
-//  1. '../firebase' must point at your firebase.js.
-//  2. It must export the Realtime Database as `db`. Storage is optional —
-//     if your firebase.js also exports `storage`, pruning deletes the JPEG
-//     as well as the record. Without it, pruning removes the record only and
-//     says so rather than pretending the file is gone.
-//
-//  The mount panel lives HERE, not on the settings page. Pointing the camera
-//  is something you do while looking at what it sees.
-//
-//  READS   /sensors/camera/{latestImageUrl,lastImageTimestamp,lastImageTarget,
-//                           last_seen,boot_count,uptime_s,free_psram}
-//          /sensors/camera/routine/*      flat, keyed by timestamp
-//          /sensors/camera/check/*        flat, keyed by timestamp
-//          /sensors/system/{motor_angle_deg,activity,activity_detail}
-//          /sensors/config/sweep/*, /sensors/config/camera/*
-//  WRITES  /sensors/control/{nudge_deg,run_home,run_zero,run_stop,
-//                            run_sweep,run_manual_sweep,capture_requested}
-//          /sensors/config/sweep/*, /sensors/config/camera/idle_home_minutes
-//  DELETES /sensors/camera/<store>/<ts>   when pruning past the cap
-// ===========================================================================
+                                                                              
+                                      
+                                                                        
+  
+                                           
+                                           
+                                                    
+                                                                          
+                                                                           
+                                                                             
+                                                       
+  
+                                                                             
+                                                      
+  
+                                                                               
+                                                                      
+                                                                   
+                                                                   
+                                                                      
+                                                             
+                                                                   
+                                                                           
+                                                                             
+                                                                    
+                                                                              
 
 import { useEffect, useRef, useState } from 'react';
 import { ref, onValue, update, set, remove } from 'firebase/database';
 import { getStorage, ref as sref, deleteObject } from 'firebase/storage';
-import * as fb from '../firebase';              // <-- 1. check this path
+import * as fb from '../firebase';                                       
 
-// A namespace import, not a named one: if firebase.js has no `storage` export,
-// a named import would fail the build, while this just reads undefined. The
-// fallback asks the default app, which must exist because `db` came from it.
+                                                                               
+                                                                            
+                                                                             
 const db = fb.db;
 let storage = null;
 try { storage = fb.storage ?? getStorage(); } catch { storage = null; }
 
-// Mirrors the firmware. Change these there and here together, or the portal
-// offers values the board then clamps.
-const FRAMES_MIN = 1;          // 1 = a single frame at home, no motor movement
+                                                                            
+                                       
+const FRAMES_MIN = 1;                                                          
 const FRAMES_MAX = 9;
 const SPANS = [0, 90, 180, 360];
 const SURVEY_MIN_H = 1, SURVEY_MAX_H = 24;
 const IDLE_HOME_MAX = 240;
 
-const RETAIN_MAX = 360;        // frames kept per store
+const RETAIN_MAX = 360;                                
 const NUDGES = [15, 45, 90];
 
 export default function CameraPage() {
@@ -89,9 +89,9 @@ export default function CameraPage() {
   const sweep = cfg.sweep || {};
   const routineFrames = numOr(sweep.routine_frames, 5);
   const routineSpan   = numOr(sweep.routine_span_deg, 180);
-  // Manual-sweep geometry. Stored in config so the page remembers it, but the
-  // firmware does NOT read manual geometry from config — it reads it from the
-  // control node at the moment the command is picked up. Both happen below.
+                                                                              
+                                                                              
+                                                                            
   const manFrames     = numOr(sweep.manual_frames, 3);
   const manSpan       = numOr(sweep.manual_span_deg, 90);
   const surveyHours   = numOr(cfg.survey_interval_hours, 6);
@@ -100,7 +100,7 @@ export default function CameraPage() {
   const frames = store === 'routine' ? routine : check;
   const over   = Math.max(0, frames.length - RETAIN_MAX);
 
-  // ---- actions ----------------------------------------------------------
+                                                                            
   const cmd = async (path, value, label) => {
     setBusy(label); setToast(null);
     try { await set(ref(db, path), value); setToast({ k: 'ok', t: `${label} sent.` }); }
@@ -108,23 +108,23 @@ export default function CameraPage() {
     finally { setBusy(null); }
   };
 
-  // SEND WHAT IS ON SCREEN, TO EVERY KEY A BOARD MIGHT READ.
-  //
-  // Three separate things went wrong here, so this fixes all three at once.
-  //
-  // 1. Reading the numbers from the subscribed config meant the button used
-  //    whatever had last round-tripped from Firebase. Type 9, click straight
-  //    away, and the old value was still in state. The refs below read the
-  //    inputs themselves, so what is displayed is what is sent.
-  //
-  // 2. Different firmware revisions take the manual geometry from different
-  //    places: the current one from /sensors/control, an earlier one from the
-  //    check-sweep keys in /sensors/config. Writing both costs one extra
-  //    update and is harmless either way, because the check sweep is disabled.
-  //
-  // 3. Config is written FIRST and the run flag LAST. The board polls control
-  //    every few seconds and calls fetchConfig() when it picks the command up,
-  //    so the geometry is already in place by the time the flag is seen.
+                                                             
+    
+                                                                            
+    
+                                                                            
+                                                                             
+                                                                           
+                                                                
+    
+                                                                            
+                                                                              
+                                                                         
+                                                                               
+    
+                                                                              
+                                                                               
+                                                                         
   const framesRef = useRef(null);
   const spanRef   = useRef(null);
 
@@ -137,7 +137,7 @@ export default function CameraPage() {
     try {
       await update(ref(db, '/sensors/config/sweep'), {
         manual_frames:   f, manual_span_deg: s,
-        check_frames:    f, check_span_deg:  s,   // older firmware reads these
+        check_frames:    f, check_span_deg:  s,                                
       });
       await update(ref(db, '/sensors/control'), {
         manual_sweep_frames:   f,
@@ -166,17 +166,17 @@ export default function CameraPage() {
   };
 
   async function prune() {
-    const doomed = frames.slice(RETAIN_MAX);       // oldest first beyond the cap
+    const doomed = frames.slice(RETAIN_MAX);                                     
     if (!doomed.length) return;
     setBusy('prune');
     let recs = 0, files = 0, orphans = 0, failed = 0;
     for (const f of doomed) {
       try {
-        // The JPEG goes first. If the record went first and this failed, the
-        // file would be left with nothing pointing at it and no way to find it.
+                                                                             
+                                                                                
         if (storage && f.storage_path) {
           try { await deleteObject(sref(storage, f.storage_path)); files++; }
-          catch { orphans++; }     // already gone, or Storage rules forbid it
+          catch { orphans++; }                                                
         }
         await remove(ref(db, `/sensors/camera/${store}/${f.key}`));
         recs++;
@@ -191,7 +191,7 @@ export default function CameraPage() {
     });
   }
 
-  // ---- render -----------------------------------------------------------
+                                                                            
   return (
     <div className="cam">
       <style>{CSS}</style>
@@ -216,7 +216,7 @@ export default function CameraPage() {
         <Fact label="camera boots" value={cam?.boot_count ?? '—'} sub="30 min scheduled restart" />
       </section>
 
-      {/* ------------- latest frame ------------- */}
+                                                      
       <section className="cam-card">
         <h2>Latest frame</h2>
         {cam?.latestImageUrl ? (
@@ -237,7 +237,7 @@ export default function CameraPage() {
         </div>
       </section>
 
-      {/* ------------- mount ------------- */}
+                                               
       <section className="cam-card">
         <h2>Mount</h2>
         <p className="cam-lede">
@@ -294,7 +294,6 @@ export default function CameraPage() {
         </Field>
       </section>
 
-      {/* ------------- photographic settings ------------- */}
       <section className="cam-card">
         <h2>Photographic settings</h2>
         <p className="cam-lede">
@@ -364,7 +363,6 @@ export default function CameraPage() {
         </div>
       </section>
 
-      {/* ------------- archive ------------- */}
       <section className="cam-card">
         <h2>Archive</h2>
         <div className="cam-tabs">
@@ -424,7 +422,6 @@ export default function CameraPage() {
   );
 }
 
-// ===========================================================================
 function Fact({ label, value, sub }) {
   return (
     <div className="cam-fact">
@@ -443,8 +440,7 @@ function Field({ label, hint, suffix, children }) {
   );
 }
 
-// A dial, not a slider: the mount's angle is a bearing, and a bearing reads as
-// a bearing. The arc shows the span the routine survey would sweep from here.
+                                                                              
 function Dial({ angle }) {
   const R = 46, C = 58;
   const a = ((angle - 90) * Math.PI) / 180;
@@ -469,14 +465,14 @@ function Dial({ angle }) {
   );
 }
 
-// ===========================================================================
+                                                                              
 function numOr(v, d) { return typeof v === 'number' && Number.isFinite(v) ? v : d; }
 function clamp(v, lo, hi) {
   if (!Number.isFinite(v)) return lo;
   return Math.max(lo, Math.min(hi, v));
 }
-// Newest first. Keys are epoch seconds written by the camera, so they sort
-// numerically — string order would put "999" after "1000000".
+                                                                           
+                                                              
 function frameList(node) {
   if (!node || typeof node !== 'object') return [];
   return Object.entries(node)
@@ -497,14 +493,14 @@ function fmtWhen(ts) {
        + `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-// ===========================================================================
+                                                                              
 const CSS = `
-/* This page used to carry its own palette and its own dark-mode media query,
-   so it followed the operating system while every other page followed the
-   portal. That is why it was the only page that did not change colour. The
-   --cam-* names are kept because the rules below use them everywhere; they
-   now simply point at the portal's tokens, so this page follows the theme
-   automatically, light or dark. */
+                                                                             
+                                                                          
+                                                                           
+                                                                           
+                                                                          
+                                   
 .cam{
   --cam-bg:var(--bg); --cam-surface:var(--card); --cam-sunk:var(--panel-2);
   --cam-fg:var(--ink); --cam-muted:var(--muted); --cam-rule:var(--card-border);

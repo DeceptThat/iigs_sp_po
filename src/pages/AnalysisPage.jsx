@@ -4,25 +4,25 @@ import BusyBanner from '../BusyBanner.jsx';
 import LineChart from '../LineChart.jsx';
 import { vpd } from '../dryingModel.js';
 
-// NO FITTED MODEL ON THIS PAGE.
-//
-// This page used to fit a drying rate against vapour pressure deficit and
-// publish a time to the next watering. Both are gone, and the reason is in the
-// measurements rather than in the code.
-//
-// Soil is stored as an integer percentage. At the rates actually observed -
-// around 0.18 %/h once the pot is established - one least-significant digit is
-// roughly six hours of drying, so a segment needs about thirty hours before
-// its fall is large enough to fit a line through. Thirty hours spans more than
-// a full day/night cycle, which means every segment long enough to measure is
-// also long enough to average its own VPD back to the daily mean. Across the
-// whole record the usable segments land within a few hundredths of a kilopascal
-// of each other, and a response cannot be identified from points that do not
-// differ in the thing you are regressing against.
-//
-// What is left is description, and description is what the record supports:
-// how far the soil fell after each wetting event, how fast, and how straight.
-// Every number below was measured.
+                                
+  
+                                                                          
+                                                                               
+                                        
+  
+                                                                            
+                                                                               
+                                                                            
+                                                                               
+                                                                              
+                                                                             
+                                                                                
+                                                                             
+                                                  
+  
+                                                                            
+                                                                              
+                                   
 
 const RANGES = [
   { id: '1d',  label: 'Last 24 hours', hours: 24 },
@@ -31,13 +31,13 @@ const RANGES = [
   { id: 'all', label: 'All readings',  hours: null },
 ];
 
-// Segmentation thresholds. Each is a measured quantity or a system setting,
-// not a tuned number - see the explanation card at the foot of the page.
-const RISE_PCT       = 10;        // a rise this large is water, not weather
-const ATTRIB_GAP_S   = 6 * 3600;  // the configured watering cooldown
+                                                                            
+                                                                         
+const RISE_PCT       = 10;                                                  
+const ATTRIB_GAP_S   = 6 * 3600;                                     
 const MIN_PTS        = 4;
 const MIN_HOURS      = 3;
-const USABLE_DROP    = 3;         // below this the slope is quantisation noise
+const USABLE_DROP    = 3;                                                      
 const USABLE_HOURS   = 6;
 
 const C_SOIL = '#4f9d6e';
@@ -57,28 +57,28 @@ function stats(values) {
 function f1(n) { return Number(n).toFixed(1); }
 function f2(n) { return Number(n).toFixed(2); }
 
-// ---------------------------------------------------------------------------
-// Where one drying segment ends and the next begins.
-//
-// Two preparation steps, then four tests applied to each consecutive pair.
-// The rule was checked against the automation log: of the wetting events it
-// finds across the stored record, the ones that coincide with logged pump
-// activity are the ones the controller performed, and any that do not are
-// water that reached the pot some other way.
-// ---------------------------------------------------------------------------
+                                                                              
+                                                     
+  
+                                                                           
+                                                                            
+                                                                          
+                                                                          
+                                             
+                                                                              
 function analyseDrying(readings) {
-  //  1. Readings at either end of the probe's range are discarded. A
-  //     capacitive probe that has come out of the soil or lost its ground
-  //     reads at a rail, which is not a measurement of anything.
+                                                                     
+                                                                          
+                                                                 
   const pts = readings
     .filter((r) => Number.isFinite(r.soil) && r.soil > 2 && r.soil < 100 && Number.isFinite(r.timestamp))
     .sort((a, b) => a.timestamp - b.timestamp);
   if (pts.length < 5) return { med: [], bounds: [], segs: [] };
 
-  //  2. A median of five. It throws out a single wild reading outright where a
-  //     mean would let it move the answer, and it leaves a genuine step edge
-  //     exactly where it is - which matters, because the step is the feature
-  //     being detected.
+                                                                               
+                                                                             
+                                                                             
+                        
   const med = pts.map((p, i) => {
     const w = pts.slice(Math.max(0, i - 2), i + 3).map((q) => q.soil).sort((a, b) => a - b);
     return { t: p.timestamp, m: w[Math.floor(w.length / 2)], T: p.temperature, RH: p.humidity };
@@ -88,19 +88,19 @@ function analyseDrying(readings) {
   for (let i = 1; i < med.length; i++) {
     const gap = med[i].t - med[i - 1].t;
     const step = med[i].m - med[i - 1].m;
-    //  3. A gap longer than the watering cooldown ends the segment whatever
-    //     the step looks like: across a longer hole more than one watering
-    //     could have happened, so no single event can be claimed.
+                                                                            
+                                                                           
+                                                                  
     if (gap > ATTRIB_GAP_S)        bounds.push({ i, t: med[i].t, k: 'gap', d: step, h: gap / 3600 });
-    //  4. A rise of ten points is water added. The fastest drying anywhere in
-    //     the record is about 1 %/h, so half an hour moves the soil half a
-    //     point - and drying only ever moves downward.
+                                                                              
+                                                                           
+                                                       
     else if (step >= RISE_PCT)     bounds.push({ i, t: med[i].t, k: 'wetting', d: step, h: gap / 3600 });
-    //  5. A fall of ten points is the instrument. Nothing removes a tenth of
-    //     the pot's water in half an hour.
+                                                                             
+                                           
     else if (step <= -RISE_PCT)    bounds.push({ i, t: med[i].t, k: 'fault', d: step, h: gap / 3600 });
-    //  6. A shorter gap still ends the segment, because a slope fitted across
-    //     missing readings would be inventing them.
+                                                                              
+                                                    
     else if (gap > 2 * 1800)       bounds.push({ i, t: med[i].t, k: 'gap', d: step, h: gap / 3600 });
   }
 
@@ -158,7 +158,7 @@ export default function AnalysisPage({ node }) {
   const vpdSeries = useMemo(
     () => readings.map((r) => {
       const v = vpd(r.temperature, r.humidity);
-      return Number.isFinite(v) ? v : null;      // null leaves a gap, not a zero
+      return Number.isFinite(v) ? v : null;                                      
     }),
     [readings],
   );
@@ -211,10 +211,10 @@ export default function AnalysisPage({ node }) {
   const labels = readings.map((r) =>
     new Date(r.timestamp * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit' }));
 
-  // ---- the drying chart ----------------------------------------------------
-  // Soil as measured, the fitted slopes drawn as a second dashed series, and
-  // the wetting events as enlarged points. Three encodings, so the two lines
-  // are never told apart by colour alone.
+                                                                               
+                                                                             
+                                                                             
+                                          
   const dryLabels = drying.med.map((p) =>
     new Date(p.t * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit' }));
 
@@ -223,8 +223,8 @@ export default function AnalysisPage({ node }) {
     for (const s of usable) {
       a[s.i0] = s.from;
       a[s.i1] = s.to;
-      // Chart.js joins across nulls only when told to; the two endpoints alone
-      // would leave the line invisible, so fill the span linearly.
+                                                                               
+                                                                   
       for (let i = s.i0 + 1; i < s.i1; i++) {
         a[i] = s.from + ((s.to - s.from) * (i - s.i0)) / (s.i1 - s.i0);
       }
@@ -312,10 +312,10 @@ export default function AnalysisPage({ node }) {
             />
           </div>
 
-          {/* VPD gets its own frame and its own scale. Drawn against soil on a
-              shared axis it would suggest a relationship the record cannot
-              support, and the choice of right-hand scale would decide what the
-              relationship looked like. */}
+                                                                               
+                                                                           
+                                                                               
+                                           
           <div className="card card-pad" style={{ marginTop: 16 }}>
             <div className="card-title"><Icon name="chart" size={14} /> Evaporative demand</div>
             <div className="chart-legend" style={{ marginTop: 10 }}>
@@ -339,7 +339,7 @@ export default function AnalysisPage({ node }) {
             </p>
           </div>
 
-          {/* ---------------- drying ---------------- */}
+                                                          
           <div className="card card-pad" style={{ marginTop: 16 }}>
             <div className="card-title"><Icon name="droplet" size={14} /> Drying since each wetting event</div>
 
