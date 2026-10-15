@@ -9,19 +9,19 @@
 #define DHT_TYPE       DHT11
 #define SOIL_PIN       34
 #define WAKE_PIN       4
-#define PUMP_PIN       26      
-#define LIGHT_RELAY_PIN 27     
+#define PUMP_PIN       26
+#define LIGHT_RELAY_PIN 27
 #define US_TRIG_PIN    19
 #define US_ECHO_PIN    18
 #define LIGHT_PIN      13
 #define US_ECHO_TIMEOUT_US  30000UL
 #define US_SAMPLES          5
-#define US_SETTLE_MS        60    
+#define US_SETTLE_MS        60
 #define DHT_SETTLE_MS       2000UL
 #define CLIMATE_INVALID     -99.9
-#define SOIL_DRY_RAW   2547      
-#define SOIL_WET_RAW   776       
-#define SELF_CHECK_INTERVAL_S   3600ULL     
+#define SOIL_DRY_RAW   2547
+#define SOIL_WET_RAW   776
+#define SELF_CHECK_INTERVAL_S   3600ULL
 #define FAILSAFE_THRESHOLD_PCT  15
 #define DEFAULT_TIMEOUT_HOURS   6
 #define DEFAULT_PUMP_SECONDS    5
@@ -29,8 +29,8 @@
 DHT dht(DHT_PIN, DHT_TYPE);
 Preferences prefs;
 
-RTC_DATA_ATTR time_t rtcLastContactFromA = 0;   // epoch of last Board A wake
-RTC_DATA_ATTR time_t rtcLastWatered      = 0;   // epoch of last watering
+RTC_DATA_ATTR time_t rtcLastContactFromA = 0;
+RTC_DATA_ATTR time_t rtcLastWatered      = 0;
 RTC_DATA_ATTR uint32_t rtcWakeCount      = 0;
 RTC_DATA_ATTR bool     rtcClockValid     = false;
 RTC_DATA_ATTR uint32_t rtcSilenceSeconds = 0;
@@ -72,14 +72,14 @@ int readSoilPercent(int *rawOut) {
 }
 bool runPump(int seconds) {
   Serial.printf("[PUMP] running for %d s\n", seconds);
-  digitalWrite(PUMP_PIN, LOW);          // active low: energise
+  digitalWrite(PUMP_PIN, LOW);
   delay((unsigned long)seconds * 1000UL);
-  digitalWrite(PUMP_PIN, HIGH);         // de-energise
+  digitalWrite(PUMP_PIN, HIGH);
   Serial.println("[PUMP] complete");
   return true;
 }
 void applyLightState() {
-  digitalWrite(LIGHT_RELAY_PIN, rtcLightOn ? LOW : HIGH);   // relay is active LOW
+  digitalWrite(LIGHT_RELAY_PIN, rtcLightOn ? LOW : HIGH);
   gpio_hold_en((gpio_num_t)LIGHT_RELAY_PIN);
   Serial.printf("[LIGHT] relay %s\n", rtcLightOn ? "ON" : "OFF");
 }
@@ -103,7 +103,7 @@ long readEchoMedianUs() {
   }
   if (n == 0) return -1L;
 
-  for (int i = 1; i < n; i++) {           // insertion sort, n <= 5
+  for (int i = 1; i < n; i++) {
     long k = v[i];
     int j = i - 1;
     while (j >= 0 && v[j] > k) { v[j + 1] = v[j]; j--; }
@@ -113,8 +113,8 @@ long readEchoMedianUs() {
 }
 int echoUsToMm(long us, float tempC) {
   if (us <= 0) return -1;
-  float t = (tempC <= CLIMATE_INVALID + 1.0) ? 20.0 : tempC;   // fall back to 20 C
-  float mmPerUs = (331.3 + 0.606 * t) / 1000.0;                // m/s -> mm/us
+  float t = (tempC <= CLIMATE_INVALID + 1.0) ? 20.0 : tempC;
+  float mmPerUs = (331.3 + 0.606 * t) / 1000.0;
   return (int)((float)us * mmPerUs / 2.0);
 }
 
@@ -129,7 +129,7 @@ void readSlowSensors(float *t, float *h, int *rangeMm, long *rangeUs, int *light
   *t = dht.readTemperature();
   *h = dht.readHumidity();
   if (isnan(*t) || isnan(*h)) {
-    delay(2200);                          // one retry, a full cycle apart
+    delay(2200);
     *t = dht.readTemperature();
     *h = dht.readHumidity();
   }
@@ -218,18 +218,17 @@ void setup() {
   Serial1.println("R");
   Serial.println("[TX->A] R (ready)");
 
-  
   pinMode(WAKE_PIN, INPUT_PULLDOWN);
 
   pinMode(PUMP_PIN, OUTPUT);
-  digitalWrite(PUMP_PIN, HIGH);         // relay off before anything else
+  digitalWrite(PUMP_PIN, HIGH);
 
   gpio_hold_dis((gpio_num_t)LIGHT_RELAY_PIN);
   pinMode(LIGHT_RELAY_PIN, OUTPUT);
-  applyLightState();                    // restore the commanded state
+  applyLightState();
   pinMode(US_TRIG_PIN, OUTPUT);
   digitalWrite(US_TRIG_PIN, LOW);
-  pinMode(US_ECHO_PIN, INPUT);          // divider already pulls this low
+  pinMode(US_ECHO_PIN, INPUT);
   pinMode(LIGHT_PIN, INPUT);
 
   dht.begin();
@@ -257,7 +256,7 @@ void setup() {
 
     if (cmd.startsWith("C:")) {
       handleConfig(cmd);
-      cmd = awaitCommand(3000);          // the wake command follows the config
+      cmd = awaitCommand(3000);
       Serial.println("[RX] " + cmd);
     }
 
@@ -275,7 +274,7 @@ void setup() {
       Serial.println("[MODE] valid command - Board A confirmed alive");
     } else {
       rtcSpuriousWakes++;
-      
+
       rtcSilenceSeconds += (uint32_t)SELF_CHECK_INTERVAL_S;
       rtcElapsedSeconds += (uint32_t)SELF_CHECK_INTERVAL_S;
       Serial.printf("[MODE] no valid command (%lu consecutive) - silence now %lus\n",
@@ -295,7 +294,7 @@ void setup() {
     if (validCommand && cmd.startsWith("W:1")) {
       bool ok = runPump(cfgPumpSeconds);
       Serial1.printf("P:%s\n", ok ? "ok" : "fail");
-    
+
       Serial.printf("[TX] P:%s\n", ok ? "ok" : "fail");
       if (ok && rtcClockValid) rtcLastWatered = nowEpoch();
     }
@@ -321,10 +320,8 @@ void setup() {
       goToSleep();
     }
 
-    // ---------------- failsafe ----------------
     Serial.println("[FAILSAFE] Board A unreachable - operating autonomously");
 
-    
     rtcSilenceSeconds = 0;
 
     time_t assumedNow = rtcLastContactFromA + (time_t)rtcElapsedSeconds;
@@ -342,8 +339,7 @@ void setup() {
                     soil, FAILSAFE_THRESHOLD_PCT);
       if (runPump(cfgPumpSeconds)) {
         rtcLastWatered = assumedNow;
-        // Sent regardless; harmless if Board A is not listening, and picked
-        // up if it has recovered since the last check.
+
         Serial1.printf("F:%d,%ld\n", soil, (long)assumedNow);
       }
     } else if (soil >= FAILSAFE_THRESHOLD_PCT) {
@@ -354,9 +350,6 @@ void setup() {
     goToSleep();
   }
 
-  // ======================================================================
-  //  CASE 3 — cold boot. Report once, then sleep.
-  // ======================================================================
   readSlowSensors(&t, &h, &rangeMm, &rangeUs, &lightRaw);
   Serial.printf("[READ] temp=%.1f hum=%.1f soil=%d%% (raw=%d) range=%dmm (%ldus) light=%d\n",
                 t, h, soil, raw, rangeMm, rangeUs, lightRaw);
@@ -371,4 +364,4 @@ void setup() {
   goToSleep();
 }
 
-void loop() { }   // never reached; deep sleep restarts from setup()
+void loop() { }
