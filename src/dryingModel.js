@@ -1,16 +1,3 @@
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-
 export const VPD_REF = 1.3;
 
 export function svp(tempC) {
@@ -21,34 +8,6 @@ export function vpd(tempC, rhPercent) {
   if (!Number.isFinite(tempC) || !Number.isFinite(rhPercent)) return null;
   return svp(tempC) * (1 - rhPercent / 100);
 }
-
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
 export function findSegments(
   readings,
   { riseBreak = 3, maxGapHours = 3, subjectEpoch = 0 } = {},
@@ -81,7 +40,7 @@ function summarise(seg, { minPoints = 4, minHours = 3 } = {}) {
   const xs = seg.map(r => (r.timestamp - t0) / 3600);
   const ys = seg.map(r => r.soil_moisture_percent);
   const { slope, r2 } = ols(xs, ys);
-  if (!(slope < 0)) return null;                  
+  if (!(slope < 0)) return null;
 
   const vs = seg.map(r => vpd(r.temperature_c, r.humidity_percent)).filter(Number.isFinite);
   if (!vs.length) return null;
@@ -91,7 +50,7 @@ function summarise(seg, { minPoints = 4, minHours = 3 } = {}) {
     tEnd: seg[seg.length - 1].timestamp,
     hours,
     points: seg.length,
-    rate: -slope,                                  
+    rate: -slope,
     r2,
     vpd: vs.reduce((s, v) => s + v, 0) / vs.length,
     soilStart: ys[0],
@@ -117,10 +76,10 @@ function ols(xs, ys) {
 }
 
 const DEFAULTS = {
-  a0: 1.0,                
-  b0: 0.70,               
-  halfLifeDays: 21,       
-  spreadScale: 0.35,      
+  a0: 1.0,
+  b0: 0.70,
+  halfLifeDays: 21,
+  spreadScale: 0.35,
 };
 
 export function fitModel(segments, now = Date.now() / 1000, opts = {}) {
@@ -132,7 +91,7 @@ export function fitModel(segments, now = Date.now() / 1000, opts = {}) {
   const w = segments.map(s => {
     const ageDays = Math.max(0, (now - s.tEnd) / 86400);
     const recency = Math.pow(0.5, ageDays / o.halfLifeDays);
-    return s.hours * Math.max(0, s.r2) * recency;      
+    return s.hours * Math.max(0, s.r2) * recency;
   });
 
   const W = w.reduce((s, v) => s + v, 0);
@@ -164,7 +123,7 @@ export function fitModel(segments, now = Date.now() / 1000, opts = {}) {
   return {
     a, b, sd, spread,
     n: segments.length,
-    trust: sxx > 0 ? 1 - lamB / (lamB + sxx) : 0,    
+    trust: sxx > 0 ? 1 - lamB / (lamB + sxx) : 0,
     prior: false,
   };
 }
@@ -183,7 +142,6 @@ export function hoursToThreshold(model, soilNow, threshold, vpdNow) {
   return { hours: h, low: (soilNow - threshold) / lo, high: (soilNow - threshold) / hi };
 }
 
- 
 export function describe(model) {
   if (model.prior) return 'No drying cycles observed yet — using the reference values.';
   const t = Math.round(model.trust * 100);
@@ -200,7 +158,6 @@ export function describe(model) {
        + `The response to evaporative demand is measured from this plant (${t}%).`;
 }
 
- 
 export function backtest(segments, now = Date.now() / 1000, opts = {}) {
   if (segments.length < 3) return null;
   const errs = segments.map((s, i) => {

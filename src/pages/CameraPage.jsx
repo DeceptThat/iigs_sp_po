@@ -1,51 +1,19 @@
-                                                                              
-                                      
-                                                                        
-  
-                                           
-                                           
-                                                    
-                                                                          
-                                                                           
-                                                                             
-                                                       
-  
-                                                                             
-                                                      
-  
-                                                                               
-                                                                      
-                                                                   
-                                                                   
-                                                                      
-                                                             
-                                                                   
-                                                                           
-                                                                             
-                                                                    
-                                                                              
-
 import { useEffect, useRef, useState } from 'react';
 import { ref, onValue, update, set, remove } from 'firebase/database';
 import { getStorage, ref as sref, deleteObject } from 'firebase/storage';
-import * as fb from '../firebase';                                       
+import * as fb from '../firebase';
 
-                                                                               
-                                                                            
-                                                                             
 const db = fb.db;
 let storage = null;
 try { storage = fb.storage ?? getStorage(); } catch { storage = null; }
 
-                                                                            
-                                       
-const FRAMES_MIN = 1;                                                          
+const FRAMES_MIN = 1;
 const FRAMES_MAX = 9;
 const SPANS = [0, 90, 180, 360];
 const SURVEY_MIN_H = 1, SURVEY_MAX_H = 24;
 const IDLE_HOME_MAX = 240;
 
-const RETAIN_MAX = 360;                                
+const RETAIN_MAX = 360;
 const NUDGES = [15, 45, 90];
 
 export default function CameraPage() {
@@ -89,9 +57,7 @@ export default function CameraPage() {
   const sweep = cfg.sweep || {};
   const routineFrames = numOr(sweep.routine_frames, 5);
   const routineSpan   = numOr(sweep.routine_span_deg, 180);
-                                                                              
-                                                                              
-                                                                            
+
   const manFrames     = numOr(sweep.manual_frames, 3);
   const manSpan       = numOr(sweep.manual_span_deg, 90);
   const surveyHours   = numOr(cfg.survey_interval_hours, 6);
@@ -100,7 +66,6 @@ export default function CameraPage() {
   const frames = store === 'routine' ? routine : check;
   const over   = Math.max(0, frames.length - RETAIN_MAX);
 
-                                                                            
   const cmd = async (path, value, label) => {
     setBusy(label); setToast(null);
     try { await set(ref(db, path), value); setToast({ k: 'ok', t: `${label} sent.` }); }
@@ -108,23 +73,6 @@ export default function CameraPage() {
     finally { setBusy(null); }
   };
 
-                                                             
-    
-                                                                            
-    
-                                                                            
-                                                                             
-                                                                           
-                                                                
-    
-                                                                            
-                                                                              
-                                                                         
-                                                                               
-    
-                                                                              
-                                                                               
-                                                                         
   const framesRef = useRef(null);
   const spanRef   = useRef(null);
 
@@ -137,7 +85,7 @@ export default function CameraPage() {
     try {
       await update(ref(db, '/sensors/config/sweep'), {
         manual_frames:   f, manual_span_deg: s,
-        check_frames:    f, check_span_deg:  s,                                
+        check_frames:    f, check_span_deg:  s,
       });
       await update(ref(db, '/sensors/control'), {
         manual_sweep_frames:   f,
@@ -166,17 +114,16 @@ export default function CameraPage() {
   };
 
   async function prune() {
-    const doomed = frames.slice(RETAIN_MAX);                                     
+    const doomed = frames.slice(RETAIN_MAX);
     if (!doomed.length) return;
     setBusy('prune');
     let recs = 0, files = 0, orphans = 0, failed = 0;
     for (const f of doomed) {
       try {
-                                                                             
-                                                                                
+
         if (storage && f.storage_path) {
           try { await deleteObject(sref(storage, f.storage_path)); files++; }
-          catch { orphans++; }                                                
+          catch { orphans++; }
         }
         await remove(ref(db, `/sensors/camera/${store}/${f.key}`));
         recs++;
@@ -191,7 +138,6 @@ export default function CameraPage() {
     });
   }
 
-                                                                            
   return (
     <div className="cam">
       <style>{CSS}</style>
@@ -216,7 +162,6 @@ export default function CameraPage() {
         <Fact label="camera boots" value={cam?.boot_count ?? '—'} sub="30 min scheduled restart" />
       </section>
 
-                                                      
       <section className="cam-card">
         <h2>Latest frame</h2>
         {cam?.latestImageUrl ? (
@@ -237,7 +182,6 @@ export default function CameraPage() {
         </div>
       </section>
 
-                                               
       <section className="cam-card">
         <h2>Mount</h2>
         <p className="cam-lede">
@@ -440,7 +384,6 @@ function Field({ label, hint, suffix, children }) {
   );
 }
 
-                                                                              
 function Dial({ angle }) {
   const R = 46, C = 58;
   const a = ((angle - 90) * Math.PI) / 180;
@@ -465,14 +408,12 @@ function Dial({ angle }) {
   );
 }
 
-                                                                              
 function numOr(v, d) { return typeof v === 'number' && Number.isFinite(v) ? v : d; }
 function clamp(v, lo, hi) {
   if (!Number.isFinite(v)) return lo;
   return Math.max(lo, Math.min(hi, v));
 }
-                                                                           
-                                                              
+
 function frameList(node) {
   if (!node || typeof node !== 'object') return [];
   return Object.entries(node)
@@ -493,14 +434,8 @@ function fmtWhen(ts) {
        + `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-                                                                              
 const CSS = `
-                                                                             
-                                                                          
-                                                                           
-                                                                           
-                                                                          
-                                   
+
 .cam{
   --cam-bg:var(--bg); --cam-surface:var(--card); --cam-sunk:var(--panel-2);
   --cam-fg:var(--ink); --cam-muted:var(--muted); --cam-rule:var(--card-border);

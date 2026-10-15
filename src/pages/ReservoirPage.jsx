@@ -1,37 +1,12 @@
-                                                                              
-                                         
-                                                      
-  
-                                           
-                                           
-                                                                            
-                                                                          
-                                                                          
-                                                      
-  
-                                                                          
-                                                                          
-  
-                                                                  
-                                                      
-                                                                 
-                                                         
-                                                                 
-                                                 
-                                                                              
-
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ref, onValue, update, set, query, limitToLast } from 'firebase/database';
-import { db } from '../firebase';                                   
+import { db } from '../firebase';
 
-                                                                                
-                                                                               
 const GAP_MIN_MM  = 30;
 const GAP_MAX_MM  = 1000;
 const SPAN_MIN_MM = 20;
-const DEAD_ZONE_MM = 20;                                              
+const DEAD_ZONE_MM = 20;
 
-                                                                                
 const FRESH_WINDOW_S = 120;
 const CHECK_TIMEOUT_S = 90;
 
@@ -41,14 +16,13 @@ export default function ReservoirPage() {
   const [history, setHistory] = useState([]);
   const [now, setNow]         = useState(() => Math.floor(Date.now() / 1000));
   const [toast, setToast]     = useState(null);
-  const [busy, setBusy]       = useState(null);                                  
+  const [busy, setBusy]       = useState(null);
   const [waitingSince, setWaitingSince] = useState(null);
   const [draft, setDraft]     = useState({ full: '', empty: '' });
   const [dims, setDims]       = useState(() => readDims());
 
   const tsAtRequest = useRef(null);
 
-                                                                             
   useEffect(() => {
     const offCurrent = onValue(ref(db, '/sensors/current'), s => setCurrent(s.val()));
     const offCfg = onValue(ref(db, '/sensors/config/reservoir'), s => {
@@ -68,13 +42,11 @@ export default function ReservoirPage() {
     return () => { offCurrent(); offCfg(); offHist(); };
   }, []);
 
-                                                                  
   useEffect(() => {
     const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(id);
   }, []);
 
-                                                                             
   const gapMm   = numOrNull(current?.reservoir_gap_mm);
   const readingTs = numOrNull(current?.timestamp);
   const ageS    = readingTs == null ? null : Math.max(0, now - readingTs);
@@ -93,13 +65,12 @@ export default function ReservoirPage() {
   const mlPerMm = useMemo(() => {
     const L = Number(dims.l), W = Number(dims.w);
     if (!(L > 0 && W > 0)) return null;
-    return (L * W) / 1000;                                                      
+    return (L * W) / 1000;
   }, [dims]);
 
   const remainingMl = depthMm != null && mlPerMm != null
     ? Math.round(depthMm * mlPerMm) : null;
 
-                                                
   useEffect(() => {
     if (waitingSince == null) return;
     if (readingTs != null && tsAtRequest.current != null &&
@@ -120,7 +91,6 @@ export default function ReservoirPage() {
     }
   }, [now, readingTs, waitingSince]);
 
-                                                                             
   async function runCheckNow() {
     setToast(null);
     tsAtRequest.current = readingTs;
@@ -171,7 +141,6 @@ export default function ReservoirPage() {
     try { localStorage.setItem('rsv.dims', JSON.stringify(next)); } catch {}
   }
 
-                                                                             
   const captureBlock = !hasGap
     ? (noEcho ? 'The rangefinder returned no echo. Nothing to capture.'
               : 'No reservoir reading yet. Flash Board A, then run a check.')
@@ -198,7 +167,6 @@ export default function ReservoirPage() {
         </div>
       </header>
 
-                                                          
       <section className="rsv-card rsv-level">
         <Tank
           gapMm={gapMm}
@@ -400,7 +368,7 @@ function CalEnd({ label, hint, stored, liveGap, disabled, draft, onDraft,
 function Resolution({ mlPerMm, span }) {
   const NOISE_MM = 3;
   const totalMl = Math.round(span * mlPerMm);
-  const minDrop = NOISE_MM + 2;                                             
+  const minDrop = NOISE_MM + 2;
   const detectableMl = Math.round(minDrop * mlPerMm);
   return (
     <>
@@ -427,8 +395,6 @@ function Tank({ gapMm, gapEmpty, gapFull, pct, noEcho }) {
   const innerH = H - PAD * 2;
   const bodyTop = PAD, bodyBot = H - PAD;
 
-                                                                            
-                                                           
   const deadFrac = Math.min(0.22, 20 / Math.max(1, gapEmpty));
   const deadH = innerH * deadFrac;
   const waterTop = bodyTop + deadH;
@@ -441,7 +407,7 @@ function Tank({ gapMm, gapEmpty, gapFull, pct, noEcho }) {
   return (
     <svg className="rsv-tank" viewBox={`0 0 ${W} ${H}`} role="img"
          aria-label={pct == null ? 'Reservoir level unknown' : `Reservoir at ${pct}%`}>
-                       
+
       <rect x={PAD} y={bodyTop} width={W - PAD * 2} height={deadH}
             fill="var(--rsv-dead)" />
       <line x1={PAD} y1={waterTop} x2={W - PAD} y2={waterTop}
@@ -449,7 +415,6 @@ function Tank({ gapMm, gapEmpty, gapFull, pct, noEcho }) {
       <text x={W - PAD - 4} y={bodyTop + deadH / 2 + 3} textAnchor="end"
             className="rsv-tank-tick">dead zone</text>
 
-                   
       {pct != null && fillH > 0 && (
         <>
           <rect x={PAD} y={fillY} width={W - PAD * 2} height={fillH}
@@ -464,11 +429,9 @@ function Tank({ gapMm, gapEmpty, gapFull, pct, noEcho }) {
         </text>
       )}
 
-                   
       <path d={`M ${PAD} ${bodyTop} L ${PAD} ${bodyBot} L ${W - PAD} ${bodyBot} L ${W - PAD} ${bodyTop}`}
             fill="none" stroke="var(--rsv-fg)" strokeWidth="2" />
 
-                        
       <text x={PAD + 4} y={waterTop + 13} className="rsv-tank-tick">
         full · {gapFull} mm gap
       </text>
@@ -512,14 +475,8 @@ function Trend({ series }) {
   );
 }
 
-                                                                              
-           
-                                                                              
 function numOrNull(v) { return typeof v === 'number' && Number.isFinite(v) ? v : null; }
 
-                                                                               
-                                                                                
-                                  
 function clampInt(v, lo, hi, dflt) {
   if (v === null || v === undefined || v === '') return dflt;
   const n = Math.round(Number(v));
@@ -527,10 +484,6 @@ function clampInt(v, lo, hi, dflt) {
   return Math.max(lo, Math.min(hi, n));
 }
 
-                                                                        
-                                                                                
-                                                                              
-                                                               
 function pctFromGap(gap, empty, full) {
   const span = empty - full;
   if (span <= 0 || gap <= 0) return null;
@@ -555,18 +508,8 @@ function readDims() {
   return { l: '', w: '' };
 }
 
-                                                                              
-                                                
-                                                                              
 const CSS = `
-                                                                     
-                                                                             
-                                                                              
-                                                                            
 
-                                                                             
-                                                                           
-                                                                               
 .rsv{
   --rsv-bg:var(--bg); --rsv-surface:var(--card); --rsv-fg:var(--ink);
   --rsv-muted:var(--muted); --rsv-rule:var(--card-border);

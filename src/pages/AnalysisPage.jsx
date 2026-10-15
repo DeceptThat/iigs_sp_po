@@ -4,26 +4,6 @@ import BusyBanner from '../BusyBanner.jsx';
 import LineChart from '../LineChart.jsx';
 import { vpd } from '../dryingModel.js';
 
-                                
-  
-                                                                          
-                                                                               
-                                        
-  
-                                                                            
-                                                                               
-                                                                            
-                                                                               
-                                                                              
-                                                                             
-                                                                                
-                                                                             
-                                                  
-  
-                                                                            
-                                                                              
-                                   
-
 const RANGES = [
   { id: '1d',  label: 'Last 24 hours', hours: 24 },
   { id: '7d',  label: 'Last 7 days',   hours: 24 * 7 },
@@ -31,13 +11,11 @@ const RANGES = [
   { id: 'all', label: 'All readings',  hours: null },
 ];
 
-                                                                            
-                                                                         
-const RISE_PCT       = 10;                                                  
-const ATTRIB_GAP_S   = 6 * 3600;                                     
+const RISE_PCT       = 10;
+const ATTRIB_GAP_S   = 6 * 3600;
 const MIN_PTS        = 4;
 const MIN_HOURS      = 3;
-const USABLE_DROP    = 3;                                                      
+const USABLE_DROP    = 3;
 const USABLE_HOURS   = 6;
 
 const C_SOIL = '#4f9d6e';
@@ -57,28 +35,13 @@ function stats(values) {
 function f1(n) { return Number(n).toFixed(1); }
 function f2(n) { return Number(n).toFixed(2); }
 
-                                                                              
-                                                     
-  
-                                                                           
-                                                                            
-                                                                          
-                                                                          
-                                             
-                                                                              
 function analyseDrying(readings) {
-                                                                     
-                                                                          
-                                                                 
+
   const pts = readings
     .filter((r) => Number.isFinite(r.soil) && r.soil > 2 && r.soil < 100 && Number.isFinite(r.timestamp))
     .sort((a, b) => a.timestamp - b.timestamp);
   if (pts.length < 5) return { med: [], bounds: [], segs: [] };
 
-                                                                               
-                                                                             
-                                                                             
-                        
   const med = pts.map((p, i) => {
     const w = pts.slice(Math.max(0, i - 2), i + 3).map((q) => q.soil).sort((a, b) => a - b);
     return { t: p.timestamp, m: w[Math.floor(w.length / 2)], T: p.temperature, RH: p.humidity };
@@ -88,19 +51,13 @@ function analyseDrying(readings) {
   for (let i = 1; i < med.length; i++) {
     const gap = med[i].t - med[i - 1].t;
     const step = med[i].m - med[i - 1].m;
-                                                                            
-                                                                           
-                                                                  
+
     if (gap > ATTRIB_GAP_S)        bounds.push({ i, t: med[i].t, k: 'gap', d: step, h: gap / 3600 });
-                                                                              
-                                                                           
-                                                       
+
     else if (step >= RISE_PCT)     bounds.push({ i, t: med[i].t, k: 'wetting', d: step, h: gap / 3600 });
-                                                                             
-                                           
+
     else if (step <= -RISE_PCT)    bounds.push({ i, t: med[i].t, k: 'fault', d: step, h: gap / 3600 });
-                                                                              
-                                                    
+
     else if (gap > 2 * 1800)       bounds.push({ i, t: med[i].t, k: 'gap', d: step, h: gap / 3600 });
   }
 
@@ -158,7 +115,7 @@ export default function AnalysisPage({ node }) {
   const vpdSeries = useMemo(
     () => readings.map((r) => {
       const v = vpd(r.temperature, r.humidity);
-      return Number.isFinite(v) ? v : null;                                      
+      return Number.isFinite(v) ? v : null;
     }),
     [readings],
   );
@@ -211,10 +168,6 @@ export default function AnalysisPage({ node }) {
   const labels = readings.map((r) =>
     new Date(r.timestamp * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit' }));
 
-                                                                               
-                                                                             
-                                                                             
-                                          
   const dryLabels = drying.med.map((p) =>
     new Date(p.t * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit' }));
 
@@ -223,8 +176,7 @@ export default function AnalysisPage({ node }) {
     for (const s of usable) {
       a[s.i0] = s.from;
       a[s.i1] = s.to;
-                                                                               
-                                                                   
+
       for (let i = s.i0 + 1; i < s.i1; i++) {
         a[i] = s.from + ((s.to - s.from) * (i - s.i0)) / (s.i1 - s.i0);
       }
@@ -312,10 +264,6 @@ export default function AnalysisPage({ node }) {
             />
           </div>
 
-                                                                               
-                                                                           
-                                                                               
-                                           
           <div className="card card-pad" style={{ marginTop: 16 }}>
             <div className="card-title"><Icon name="chart" size={14} /> Evaporative demand</div>
             <div className="chart-legend" style={{ marginTop: 10 }}>
@@ -339,7 +287,6 @@ export default function AnalysisPage({ node }) {
             </p>
           </div>
 
-                                                          
           <div className="card card-pad" style={{ marginTop: 16 }}>
             <div className="card-title"><Icon name="droplet" size={14} /> Drying since each wetting event</div>
 

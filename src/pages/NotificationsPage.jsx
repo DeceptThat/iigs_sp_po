@@ -1,19 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Icon } from '../icons.jsx';
 
-                                                   
-  
-                                                                               
-                                                                            
-                                                                       
-                                         
-  
-                                                                            
-                                                                             
-                                                                              
-                                                                    
 const META = {
-                                  
+
   watered:              { icon: 'droplet', tone: 'ok',    unit: '%'  },
   soil_low:             { icon: 'droplet', tone: 'warn',  unit: '%',  family: 'soil' },
   soil_recovered:       { icon: 'check',   tone: 'ok',    unit: '%',  clears: 'soil' },
@@ -30,7 +19,6 @@ const META = {
   failsafe_active:      { icon: 'shield',  tone: 'crit',  unit: '%'  },
   capture_failed:       { icon: 'camera',  tone: 'muted'              },
 
-                                       
   pump: { icon: 'droplet', tone: 'ok' },
   temp: { icon: 'thermo',  tone: 'crit' },
   hum:  { icon: 'droplet', tone: 'warn' },
@@ -68,32 +56,19 @@ export default function NotificationsPage({ node }) {
   const [filter, setFilter] = useState('all');
   const raw = source === 'device' ? deviceNotifications : notifications;
 
-                                                 
-    
-                                                                                
-                                                                           
-                                                                            
-                                                  
   const { list, pairable, counts } = useMemo(() => {
     const dated = raw.length > 0 && raw.every((n) => Number.isFinite(n.timestamp));
     const items = raw.map((n) => ({ ...n, meta: META[n.type] || META.info }));
 
     if (dated) {
-      const byTime = [...items].sort((a, b) => b.timestamp - a.timestamp);                
-      const openByFamily = new Map();                                              
-                                                                            
-                                         
+      const byTime = [...items].sort((a, b) => b.timestamp - a.timestamp);
+      const openByFamily = new Map();
+
       for (let i = byTime.length - 1; i >= 0; i--) {
         const n = byTime[i];
         const { family, clears } = n.meta;
         if (family) {
-                                                                                
-            
-                                                                              
-                                                                             
-                                                                            
-                                                                               
-                                                 
+
           const openList = openByFamily.get(family) || [];
           for (const prev of openList) prev.supersededBy = n;
           if (openList.length) n.supersedes = openList[openList.length - 1];
@@ -131,10 +106,7 @@ export default function NotificationsPage({ node }) {
     let v = list;
     if (filter === 'open') v = v.filter((n) => n.meta.family && !n.resolvedBy && !n.supersededBy);
     if (filter === 'crit') v = v.filter((n) => n.severity === 'critical' || n.meta.tone === 'crit');
-                                                                             
-                                                        
-                                                                            
-                                                                           
+
     if (pairable) v = v.filter((n) => !n.resolves && !n.supersededBy);
     return v;
   }, [list, filter, pairable]);

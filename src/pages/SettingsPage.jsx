@@ -3,12 +3,6 @@ import { Icon } from '../icons.jsx';
 import BusyBanner from '../BusyBanner.jsx';
 import { PLANT_PROFILES, getProfile } from '../plantProfiles.js';
 
- 
- 
- 
- 
- 
-
 function Row({ name, value, desc, children }) {
   return (
     <div className="aut-row">
@@ -49,8 +43,6 @@ export default function SettingsPage({ node }) {
   const [dirty, setDirty] = useState(false);
   const [note, setNote] = useState('');
 
-   
-   
   useEffect(() => { if (!dirty) setDraft(settings); }, [settings, dirty]);
 
   const edit = (patch) => { setDraft((d) => ({ ...d, ...patch })); setDirty(true); };
@@ -58,18 +50,12 @@ export default function SettingsPage({ node }) {
   const byPreset = draft.plantMode === 'preset';
   const profile = byPreset ? getProfile(draft.plantType) : null;
 
-   
-   
-   
   const applyProfile = (id) => {
     const pr = getProfile(id);
     if (!pr) return;
     edit({ plantType: id, moistureThreshold: pr.threshold, cooldownHours: pr.cooldownHours });
   };
 
-   
-   
-   
   const setMode = (mode) => {
     if (mode === 'preset') {
       const pr = getProfile(draft.plantType) || PLANT_PROFILES[0];
@@ -128,7 +114,6 @@ export default function SettingsPage({ node }) {
 
       <div className="grid-2">
 
-        
         <div className="card card-pad">
           <div className="card-title"><Icon name="droplet" size={14} /> Watering</div>
           <div style={{ marginTop: 14 }}>
@@ -193,9 +178,6 @@ export default function SettingsPage({ node }) {
               </div>
             )}
 
-            
-
-
             <Row
               name="Moisture threshold"
               value={`${draft.moistureThreshold}%`}
@@ -252,7 +234,6 @@ export default function SettingsPage({ node }) {
           )}
         </div>
 
-        
         <div className="card card-pad">
           <div className="card-title"><Icon name="chart" size={14} /> Recording</div>
           <div style={{ marginTop: 14 }}>
@@ -307,7 +288,6 @@ export default function SettingsPage({ node }) {
           </div>
         </div>
 
-        
         <div className="card card-pad">
           <div className="card-title"><Icon name="camera" size={14} /> Photographic sweeps</div>
           <div style={{ marginTop: 14 }}>
@@ -366,7 +346,6 @@ export default function SettingsPage({ node }) {
           </div>
         </div>
 
-        
         <div className="card card-pad">
           <div className="card-title"><Icon name="bell" size={14} /> Notifications</div>
           <div style={{ marginTop: 14 }}>
@@ -403,10 +382,6 @@ export default function SettingsPage({ node }) {
           </div>
         </div>
 
-                                                                                
-                                                                                 
-                                                                              
-                                         
         <div className="card card-pad">
           <div className="card-title"><Icon name="save" size={14} /> Changes</div>
           <div className="aut-actions" style={{ marginTop: 14 }}>
@@ -424,10 +399,6 @@ export default function SettingsPage({ node }) {
         </div>
       </div>
 
-                                                       
-                                                                              
-                                                                               
-                                                                             
     </section>
   );
 }

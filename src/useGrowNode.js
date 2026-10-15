@@ -2,26 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onValue, ref, remove, set, update } from 'firebase/database';
 import { db } from './firebase.js';
 
- 
- 
- 
- 
- 
- 
- 
- 
- 
 const NOTIF_KEY = 'grownode.notifications';
 const LOCAL_KEY = 'grownode.local';
 
- 
- 
 export const LOCAL_DEFAULTS = {
   humidityAlertLow: 40,
 };
 
- 
- 
 export const DEFAULTS = {
   moistureThreshold: 60,
   waterDurationSec: 5,
@@ -30,17 +17,9 @@ export const DEFAULTS = {
   humidityAlertLow: 40,
   cooldownHours: 6,
 
-   
-   
-   
-   
-   
   plantMode: 'manual',
   plantType: 'houseplant',
-   
-   
-   
-   
+
   subjectEpoch: 0,
   subjectLabel: '',
   failsafeHours: 6,
@@ -80,9 +59,7 @@ export function useGrowNode() {
   const [soilMoisture, setSoilMoisture] = useState(0);
   const [humidity, setHumidity] = useState(0);
   const [temperature, setTemperature] = useState(0);
-                                                                            
-                                                                             
-                                                                        
+
   const [reservoir, setReservoir] = useState({ percent: null, gapMm: null });
   const [runPump, setRunPump] = useState(false);
   const [motorAngle, setMotorAngle] = useState(0);
@@ -108,7 +85,6 @@ export function useGrowNode() {
   const [motorLog, setMotorLog] = useState([]);
   const [live, setLive] = useState({ labels: [], temp: [], hum: [], soil: [] });
 
-   
   const [system, setSystem] = useState({});
   const [camera, setCamera] = useState({});
 
@@ -168,10 +144,7 @@ export function useGrowNode() {
       if (t !== undefined) setTemperature(t);
       if (h !== undefined) setHumidity(h);
       if (s !== undefined) setSoilMoisture(s);
-                                                                                
-                                                                              
-                                                                              
-               
+
       setReservoir({
         percent: data.reservoir_ok === false ? null
                : (typeof data.reservoir_percent === 'number' ? data.reservoir_percent : null),
@@ -197,8 +170,6 @@ export function useGrowNode() {
       }
     });
 
-     
-     
     const unsubControl = onValue(controlRef, (snap) => {
       const data = snap.val();
       if (!data) return;
@@ -209,8 +180,6 @@ export function useGrowNode() {
       if (data.run_sweep !== undefined) setSweepPending(data.run_sweep === true);
     });
 
-     
-     
     const unsubConfig = onValue(configRef, (snap) => {
       const data = snap.val();
       if (!data) return;
@@ -270,9 +239,6 @@ export function useGrowNode() {
       setCaptureError(data.captureError !== undefined ? data.captureError : null);
       if (data.last_seen !== undefined) setCameraLastSeen(data.last_seen);
 
-       
-       
-       
       const routine = [];
       if (data.routine) {
         Object.entries(data.routine).forEach(([setId, sweep]) => {
@@ -315,12 +281,6 @@ export function useGrowNode() {
       setHistoryReadings(list);
     });
 
-     
-     
-     
-     
-     
-     
     const unsubAutoLog = onValue(autoLogRef, (snap) => {
       const data = snap.val();
       if (!data) { setAutomationLog([]); return; }
@@ -333,23 +293,9 @@ export function useGrowNode() {
           source: e.source,
           stages: st,
           collected: st[0] === 'T',
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
+
           watered: st[1] === 'U' && st[0] !== 'U',
-          wateredVerified: st[1] === 'T',        
+          wateredVerified: st[1] === 'T',
           sensorNoReply: st[0] === 'U' && st[1] === 'U',
           collectionEnabled: st[2] === 'T',
         };
@@ -357,9 +303,6 @@ export function useGrowNode() {
       setAutomationLog(list);
     });
 
-     
-     
-     
     const unsubNotif = onValue(notifRef, (snap) => {
       const data = snap.val();
       if (!data) { setDeviceNotifications([]); return; }
@@ -378,9 +321,6 @@ export function useGrowNode() {
       setDeviceNotifications(list);
     });
 
-     
-     
-     
     const unsubSurvey = onValue(surveyRef, (snap) => {
       const data = snap.val();
       if (!data) { setSurveyLog([]); return; }
@@ -398,9 +338,6 @@ export function useGrowNode() {
       setSurveyLog(list);
     });
 
-     
-     
-     
     const unsubMotor = onValue(motorRef, (snap) => {
       const data = snap.val();
       if (!data) { setMotorLog([]); return; }
@@ -439,9 +376,6 @@ export function useGrowNode() {
   const secondsSinceCameraSeen = cameraLastSeen ? Math.floor(nowTick / 1000) - cameraLastSeen : null;
   const isCameraOnline = secondsSinceCameraSeen !== null && secondsSinceCameraSeen < 90;
 
-   
-   
-   
   useEffect(() => {
     if (prev.current.pump === null) {
       prev.current.pump = runPump;
@@ -477,9 +411,6 @@ export function useGrowNode() {
     }
   }, [isBoardOnline, logEvent, pushNotif, pushToast]);
 
-   
-   
-   
   useEffect(() => {
     if (!configLoaded) return;
     const now = Date.now();
@@ -549,12 +480,6 @@ export function useGrowNode() {
   const captureTimedOut = isCapturing && captureElapsed !== null && captureElapsed > CAPTURE_TIMEOUT_SEC;
   const showCapturing = isCapturing && !captureTimedOut;
 
-   
-
-   
-   
-   
-   
   const togglePump = async () => {
     try {
       await set(ref(db, 'sensors/control/run_pump'), true);
@@ -563,9 +488,6 @@ export function useGrowNode() {
     }
   };
 
-   
-   
-   
   const runCheck = async () => {
     try {
       await set(ref(db, 'sensors/control/run_automation_check'), true);
@@ -574,9 +496,6 @@ export function useGrowNode() {
     }
   };
 
-   
-   
-   
   const runSweep = async () => {
     try {
       await set(ref(db, 'sensors/control/run_sweep'), true);
@@ -615,9 +534,6 @@ export function useGrowNode() {
     }
   };
 
-   
-   
-   
   const requestCapture = async () => {
     try {
       await update(ref(db, 'sensors/camera/control'), {
@@ -640,9 +556,6 @@ export function useGrowNode() {
     }
   };
 
-   
-   
-   
   const saveSettings = async (next) => {
     const merged = { ...settings, ...next };
     setSettings(merged);
@@ -655,13 +568,10 @@ export function useGrowNode() {
         temp_max_c: Number(merged.tempAlertHigh),
         temp_min_c: Number(merged.tempAlertLow),
         min_water_interval_hours: Number(merged.cooldownHours),
-         
-         
-         
+
         plant_mode: merged.plantMode === 'preset' ? 'preset' : 'manual',
         plant_type: String(merged.plantType || 'houseplant'),
-         
-         
+
         subject_epoch: Number(merged.subjectEpoch) || 0,
         subject_label: String(merged.subjectLabel || ''),
         failsafe_timeout_hours: Number(merged.failsafeHours),
@@ -696,14 +606,6 @@ export function useGrowNode() {
     }
   };
 
-   
-   
-   
-   
-   
-   
-   
-   
   const startNewSubject = async (label = '') => {
     const at = Math.floor(Date.now() / 1000);
     await saveSettings({ subjectEpoch: at, subjectLabel: String(label || '') });
@@ -749,8 +651,6 @@ export function useGrowNode() {
     localStorage.setItem(NOTIF_KEY, JSON.stringify([]));
   };
 
-   
-   
   const clearDeviceNotifs = async () => {
     const confirmed = window.confirm(`Delete all ${deviceNotifications.length} device notifications? This removes them for everyone.`);
     if (!confirmed) return;
@@ -779,9 +679,6 @@ export function useGrowNode() {
     }
   };
 
-   
-   
-   
   const deleteCheckPhoto = async (id) => {
     try {
       await remove(ref(db, `sensors/camera/check/${id}`));
@@ -792,7 +689,6 @@ export function useGrowNode() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-   
   const busy = useMemo(() => {
     const what = system.activity ?? 'idle';
     return {
@@ -826,9 +722,6 @@ export function useGrowNode() {
     lastImageTarget: camera.lastImageTarget ?? null,
   }), [camera]);
 
-                                                                               
-                                                                              
-                                                                             
   const resEmptyMm = Number(settings.resGapEmptyMm);
   const resFullMm = Number(settings.resGapFullMm);
   const resCalOk = Number.isFinite(resEmptyMm) && Number.isFinite(resFullMm)

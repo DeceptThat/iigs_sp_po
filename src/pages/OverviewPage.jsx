@@ -3,37 +3,8 @@ import { Icon } from '../icons.jsx';
 import BusyBanner from '../BusyBanner.jsx';
 import { vpd } from '../dryingModel.js';
 
-                            
-  
-                                                                        
-                                                                            
-                                                                             
-                                                                           
-                                                                            
-                                                                         
-                                                                              
-  
-                                                                         
-                                 
-
-                                                          
-  
-                                                                        
-                                                                             
-                                                                            
-                                    
-  
-                                                                          
-                                                                      
-                                                                           
-                                                      
-                                                                          
-                                                              
-                                                                         
-                                                                            
-                                                            
 const WETTING_RISE_PCT = 10;
-const ATTRIBUTABLE_GAP_S = 6 * 3600;                                      
+const ATTRIBUTABLE_GAP_S = 6 * 3600;
 
 function dryingSinceWetting(readings) {
   const pts = readings
@@ -47,7 +18,6 @@ function dryingSinceWetting(readings) {
     return { t: p.timestamp, m: w[Math.floor(w.length / 2)] };
   });
 
-                                                             
   let start = 0;
   for (let i = 1; i < med.length; i++) {
     const gap = med[i].t - med[i - 1].t;
@@ -70,7 +40,7 @@ function dryingSinceWetting(readings) {
     from: seg[0].m,
     to: seg[seg.length - 1].m,
     since: seg[0].t,
-    wetted: start > 0,                                                     
+    wetted: start > 0,
   };
 }
 
@@ -80,7 +50,6 @@ function fmtSpan(h) {
   return `${(h / 24).toFixed(1)} days`;
 }
 
-                                                                            
 function Sparkline({ readings, accent }) {
   const pts = useMemo(() => {
     if (!readings.length) return null;
@@ -134,20 +103,15 @@ export default function OverviewPage({ node, go }) {
   const soilPct = Number.isFinite(soilMoisture) ? Math.max(0, Math.min(100, soilMoisture)) : 0;
   const belowThreshold = Number.isFinite(soilMoisture) && soilMoisture <= threshold;
 
-                                                                               
-                                                   
   const reservoirPct = Number.isFinite(node.reservoirPercent) ? node.reservoirPercent : null;
   const reservoirMm = Number.isFinite(node.reservoirDepthMm) ? node.reservoirDepthMm : null;
 
-                                                                              
-                                                                       
   const motorSuspect = (controllerHealth.lastSurveyError || '').includes('motor');
 
   return (
     <section className="page ov">
       <BusyBanner busy={node.busy ?? { active: false }} />
 
-                                                                             
       {!isBoardOnline && (
         <div className="ov-alert">
           <span className="ov-dot" aria-hidden="true" />
@@ -169,7 +133,6 @@ export default function OverviewPage({ node, go }) {
         </div>
       </header>
 
-                                                                       
       <section className="card card-pad ov-hero">
         <div className="ov-hero-main">
           <div className="kicker">SOIL MOISTURE</div>
@@ -191,8 +154,7 @@ export default function OverviewPage({ node, go }) {
         </div>
 
         <div className="ov-hero-side">
-                                                                              
-                                                
+
           <div className="ov-mini">
             <div className="kicker">DRIED SINCE WATERING</div>
             {drying ? (
@@ -224,7 +186,6 @@ export default function OverviewPage({ node, go }) {
         </div>
       </section>
 
-                                                                   
       <section className="ov-stats">
         <div className="card card-pad ov-stat">
           <div className="kicker">TEMPERATURE</div>
@@ -269,7 +230,6 @@ export default function OverviewPage({ node, go }) {
         <Sparkline readings={last24} accent="var(--accent)" />
       </section>
 
-                                                                   
       <section className="card card-pad ov-manual">
         <span className="kicker">MANUAL</span>
         <button className="btn btn-danger" onClick={togglePump} disabled={runPump}>
@@ -287,7 +247,6 @@ export default function OverviewPage({ node, go }) {
         </button>
       </section>
 
-                                                                                    
       <section className="card card-pad ov-boards">
         <span className="kicker">BOARDS</span>
         <span className={`ov-board ${isBoardOnline ? 'ok' : 'bad'}`}>
